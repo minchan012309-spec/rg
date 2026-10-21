@@ -1,0 +1,6 @@
+RG BATTLE 프로젝트 소개 (HTML 발표 자료) — 본문 15장 + 부록 1장, 발표 약 14분
+- index.html 을 크롬/엣지/사파리로 엽니다. (assets, fonts 폴더와 같은 위치)
+- 다음 장: Enter · Space · → / 이전 장: ← · Backspace · Home/End 처음·마지막
+- G 전체 보기 · N 발표자 노트 · F 전체 화면 · ? 도움말
+- 화면(모니터 모양)을 클릭하면 크게 보이고, 목차·탭은 클릭으로 반응합니다.
+- 글꼴: Pretendard (fonts 폴더)
