@@ -4,6 +4,7 @@ import { title } from './title.mjs';
 import { moves, course, obstaclePosition } from './course.mjs';
 import { Playback } from './playback.mjs';
 import { levels, sceneProp } from './remix.mjs';
+import { Arena } from './arena.mjs';
 
 const get = id => document.getElementById(id);
 const screen = get('screen');
@@ -34,13 +35,13 @@ document.querySelector('[data-title]').textContent = title;
 
 let level = levels.findIndex(item => item.id === localStorage.getItem('festival-level'));
 if (level < 0) level = 0;
-let currentScene;
+let currentScene, arena, visibleSide = 0;
 let page, focus = 0, selected = 0, choosing = 0, chosen = [0, 1];
 let round, matchId, paused = false, starting = false, currentNames = [], receipt, playback;
 let lastPhase = '', judgementTimer, recentInput = -Infinity;
 let obstacles = [], demos = [], nextSound = 0, nextMove = 0;
 const padTimers = new Map();
-const runnerAnimations = new Map();
+
 let boardEntries = [], rosterAtStart = '', projectAtStart = '';
 const savedScores = () => localStorage.setItem('festival-scores', JSON.stringify(records));
 const pane = (heading, content) => '<section class="pane"><h1>' + heading + '</h1>' + content + '</section>';
@@ -81,41 +82,20 @@ function render() {
     const meters = [0, 1].map(side => '<div class="meter"><span>' + escape(playerName(side)) +
       '</span><strong id="score' + side + '">0</strong><progress aria-label="플레이어 ' + (side + 1) +
       ' 점수" id="bar' + side + '" max="' + round.maxScores[side] + '" value="0"></progress></div>').join('');
-    const pads = playerKeys.map((keys, side) => '<div class="console" id="pads' + side + '">' +
-      [...keys].map((key, lane) => '<span class="pad" id="pad' + side + lane + '"><b>' + key +
-        '</b><small>' + moves[lane].name + '</small></span>').join('') + '</div>').join('');
-    const tracks = chosen.map((character, side) => '<div class="track" id="track' + side + '">' +
-      '<span class="track-name">P' + (side + 1) + '</span><div class="hit-line"><span>판정선</span></div>' +
-      '<div class="obstacles" id="obstacles' + side + '"></div><div class="runner"><div class="runner-body" id="runner' +
-      side + '">' + avatar(character) + '</div></div><span class="move-effect" id="effect' + side + '"></span><span class="pressed" id="pressed' + side + '"></span></div>').join('');
+    const pads = moves.map((_, lane) => '<span class="pad" id="pad' + lane +
+      '"><b></b><small></small></span>').join('');
     screen.innerHTML = '<section class="game"><div class="hud">' + meters +
-      '</div><div class="stage course-stage" id="stage"><div class="stage-top"><div class="scene-label"><span id="scene-icon"></span><strong id="scene-name"></strong></div><div id="phase"></div><span id="clock"></span></div>' +
-      '<div class="tracks">' + tracks + '</div><div class="stage-bottom"><span id="cue"></span><strong id="judgement"></strong>' +
-      '</div></div><div class="pads">' + pads + '</div></section>';
-    obstacles = course(round).map(obstacle => {
-      const element = document.createElement('div');
-      const move = moves[obstacle.lane];
-      element.className = 'obstacle ' + move.id;
-      element.hidden = true;
-      element.dataset.demo = obstacle.demo;
-      const key = document.createElement('kbd');
-      key.textContent = playerKeys[obstacle.side][obstacle.lane];
-      const prop = document.createElement('i');
-      const definition = sceneProp(obstacle.scene, obstacle.lane);
-      if (definition) {
-        prop.textContent = definition[1];
-        prop.classList.add('scene-prop');
-      }
-      element.append(key, prop);
-      get('obstacles' + obstacle.side).append(element);
-      return { ...obstacle, element };
-    });
+      '</div><div class="stage course-stage" id="stage"><div class="stage-top"><strong id="scene-name"></strong><div id="phase"></div><span id="clock"></span></div>' +
+      '<canvas class="arena" id="arena"></canvas><div class="stage-bottom"><span id="cue"></span><strong id="judgement"></strong>' +
+      '</div></div><div class="control-deck"><div class="console" id="pads">' + pads + '</div><span id="last-input"></span></div></section>';
+    arena = new Arena(get('arena'));
+    obstacles = course(round);
     demos = obstacles.filter(obstacle => obstacle.demo);
     nextSound = nextMove = 0;
     currentScene = null;
+    visibleSide = 0;
     changeScene(round.turns[0].scene);
     padTimers.clear();
-    runnerAnimations.clear();
   }
   if (page === 'result') {
     const [one, two] = round.scores;
@@ -212,17 +192,14 @@ document.addEventListener('keydown', event => {
     const [side, lane] = mapped;
     const time = playback.time;
     recentInput = performance.now();
-    moveRunner(side, lane);
     flash(side, lane, true);
     sound(lane);
     const result = press(round, side, lane, time);
+    arena.strike(side, lane, !!result, recentInput);
     const responding = round.turns.some(turn =>
       turn.player === side && time >= turn.response && time < turn.end);
     feedback(result || (responding ? 'MISS' : '입력'), playerKeys[side][lane]);
-    if (result) {
-      propEffect(side, lane);
-      updateScores();
-    }
+    if (result) updateScores();
     return;
   }
   if (page === 'result' && get('result-actions')?.hidden) return;
@@ -297,47 +274,31 @@ function feedback(text, key = '') {
 }
 
 function flash(side, lane, input = false) {
-  const pad = get('pad' + side + lane);
-  pad.classList.add('lit');
-  clearTimeout(padTimers.get(pad));
-  padTimers.set(pad, setTimeout(() => pad.classList.remove('lit'), 180));
+  if (side === visibleSide) {
+    const pad = get('pad' + lane);
+    pad.classList.add('lit');
+    clearTimeout(padTimers.get(pad));
+    padTimers.set(pad, setTimeout(() => pad.classList.remove('lit'), 180));
+  }
   if (!input) return;
-  const indicator = get('pressed' + side);
+  const indicator = get('last-input');
   const label = sceneProp(currentScene, lane)?.[2] ?? moves[lane].name;
-  indicator.textContent = playerKeys[side][lane] + ' · ' + label;
+  indicator.textContent = 'P' + (side + 1) + ' · ' + playerKeys[side][lane] + ' · ' + label;
   clearTimeout(padTimers.get(indicator));
   padTimers.set(indicator, setTimeout(() => { indicator.textContent = ''; }, 700));
 }
 
-const movement = [
-  ['translateY(0)', 'translateY(-40%) rotate(-9deg)', 'translateY(0)'],
-  ['translateY(0)', 'translateY(-78%) rotate(14deg)', 'translateY(0)'],
-  ['scale(1)', 'translateY(30%) skewX(-18deg) scale(1.25,.52)', 'scale(1)'],
-  ['scale(1)', 'translateY(-18%) scale(.9,1.1)', 'translateY(15%) scale(1.22,.67)', 'scale(1)'],
-  ['rotate(0deg)', 'translateY(-24%) rotate(200deg)', 'rotate(360deg)'],
-];
-
-function moveRunner(side, lane) {
-  runnerAnimations.get(side)?.cancel();
-  const runner = get('runner' + side);
-  const frames = movement[lane].map(transform => ({ transform }));
-  runnerAnimations.set(side, runner.animate(frames, {
-    duration: [225, 335, 230, 250, 280][lane], easing: 'ease-out',
-  }));
-}
-
-function propEffect(side, lane) {
-  const prop = sceneProp(currentScene, lane);
-  if (!prop) return;
-  const effect = get('effect' + side);
-  effect.getAnimations().forEach(animation => animation.cancel());
-  effect.textContent = prop[1];
-  const angles = [-35, -70, 15, 55, -190];
-  effect.animate([
-    { opacity: 1, transform: 'translate(0, 0) scale(.8)' },
-    { opacity: 1, transform: 'translate(32px,-28px) rotate(' + angles[lane] + 'deg) scale(1.25)', offset: .5 },
-    { opacity: 0, transform: 'translate(66px,-45px) scale(.35)' },
-  ], { duration: 360, easing: 'ease-out' });
+function updatePads() {
+  const console = get('pads');
+  console.dataset.side = visibleSide;
+  for (let lane = 0; lane < moves.length; lane++) {
+    const pad = get('pad' + lane);
+    const prop = sceneProp(currentScene, lane);
+    pad.classList.toggle('unused', !prop);
+    pad.classList.remove('lit');
+    pad.querySelector('b').textContent = playerKeys[visibleSide][lane];
+    pad.querySelector('small').textContent = prop?.[2] ?? '';
+  }
 }
 
 function phase(id, side, label, cue) {
@@ -346,9 +307,9 @@ function phase(id, side, label, cue) {
   get('stage').dataset.side = side ?? '';
   get('phase').textContent = label;
   get('cue').textContent = cue;
-  for (let i = 0; i < 2; i++) {
-    get('pads' + i).classList.toggle('active', i === side);
-    get('track' + i).classList.toggle('active', i === side);
+  if (side != null && visibleSide !== side) {
+    visibleSide = side;
+    updatePads();
   }
 }
 
@@ -358,26 +319,33 @@ function changeScene(scene) {
   const stage = get('stage');
   stage.dataset.scene = scene.id;
   stage.style.setProperty('--scene', scene.color);
-  get('scene-icon').textContent = scene.icon;
   get('scene-name').textContent = scene.name;
-  for (let side = 0; side < 2; side++) {
-    for (let lane = 0; lane < 5; lane++) {
-      const pad = get('pad' + side + lane);
-      const prop = sceneProp(scene, lane);
-      pad.classList.toggle('unused', !prop);
-      pad.querySelector('small').textContent = prop?.[2] ?? '';
-    }
+  arena.setScene(scene);
+  updatePads();
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    arena.canvas.animate([{ filter: 'brightness(.7)' }, { filter: 'brightness(1)' }],
+      { duration: 180, easing: 'ease-out' });
   }
 }
 
-function drawObstacles(time) {
+function drawArena(time, turn) {
+  const preview = round.profile.preview;
+  const cues = [];
   for (const obstacle of obstacles) {
-    const position = obstaclePosition(obstacle, time, round.profile.preview);
-    const scored = obstacle.note?.result && obstacle.note.result !== 'MISS';
-    const hidden = position === null || !!scored || obstacle.scene !== currentScene;
-    if (obstacle.element.hidden !== hidden) obstacle.element.hidden = hidden;
-    if (!hidden) obstacle.element.style.left = (27 + position * 65 / round.profile.preview) + '%';
+    if (obstacle.scene !== currentScene || obstacle.side !== visibleSide) continue;
+    if (obstacle.demo && turn && time >= turn.response) continue;
+    if (obstacle.note?.result && obstacle.note.result !== 'MISS') continue;
+    const position = obstaclePosition(obstacle, time, preview);
+    if (position === null) continue;
+    cues.push({
+      obstacle,
+      progress: Math.min(1, 1 - position / preview),
+      key: playerKeys[obstacle.side][obstacle.lane],
+    });
   }
+  // Draw the closest cue last so the next input remains readable.
+  cues.sort((a, b) => a.progress - b.progress);
+  arena.draw(time, visibleSide, chosen[visibleSide], cues, performance.now());
 }
 
 function tick() {
@@ -398,12 +366,6 @@ function tick() {
     const index = round.turns.findIndex(turn => time >= turn.start && time < turn.end);
     const turn = round.turns[index];
     if (turn) changeScene(turn.scene);
-    while (nextMove < demos.length && demos[nextMove].at <= time) {
-      const demo = demos[nextMove++];
-      moveRunner(demo.side, demo.lane);
-      flash(demo.side, demo.lane);
-      propEffect(demo.side, demo.lane);
-    }
     if (!turn) {
       const closing = time >= round.turns.at(-1).end;
       phase(closing ? 'end' : 'wait', null, closing ? '곡 마무리' : '준비!', songs[selected].name);
@@ -419,7 +381,12 @@ function tick() {
         get('cue').textContent = '다음 ' + playerKeys[turn.player][upcoming.lane] + ' · ' + prop[2];
       } else get('cue').textContent = '이번 차례 끝!';
     }
-    drawObstacles(time);
+    while (nextMove < demos.length && demos[nextMove].at <= time) {
+      const demo = demos[nextMove++];
+      arena.strike(demo.side, demo.lane, true, performance.now());
+      flash(demo.side, demo.lane);
+    }
+    drawArena(time, turn);
   }
   requestAnimationFrame(tick);
 }
