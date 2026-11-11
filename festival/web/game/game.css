@@ -133,3 +133,4 @@ input{width:100%;padding:10px;background:var(--ink);color:var(--paper);border:1p
 .mode-setting select{justify-self:start;padding:7px 12px;background:#171327;border:1px solid var(--line);color:var(--paper);font:inherit}
 .mode-setting small{grid-column:1/-1;color:var(--muted)}
 .console[data-mode="domes"]{grid-template-columns:repeat(2,minmax(120px,190px))}
+.timing-note.preview{opacity:.38}

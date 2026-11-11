@@ -428,18 +428,21 @@ function drawArena(time, turn) {
   const preview = round.profile.preview;
   const cues = [];
   const nextMarkers = new Set();
-  const travel = turn?.response - turn?.prepare || (turn?.beat ?? round.turns[0].beat) * 2;
+  const travel = (turn?.beat ?? round.turns[0].beat) * 4;
   for (const obstacle of obstacles) {
     if (obstacle.scene !== currentScene || obstacle.side !== visibleSide) continue;
     if (turn && obstacle.demo && time >= turn.prepare) continue;
-    if (turn && !obstacle.demo && time < turn.prepare) continue;
     if (obstacle.note?.result && obstacle.note.result !== 'MISS') continue;
-    const progress = approachProgress(obstacle, time, preview);
-    if (progress !== null) cues.push({ obstacle, progress });
+    const earlyResponse = !!turn && !obstacle.demo && time < turn.prepare;
+    if (!earlyResponse) {
+      const progress = approachProgress(obstacle, time, preview);
+      if (progress !== null) cues.push({ obstacle, progress });
+    }
     const rail = railProgress(obstacle.at, time, travel);
     if (rail === null) continue;
     const marker = obstacle.marker;
     marker.hidden = false;
+    marker.classList.toggle('preview', earlyResponse);
     marker.style.left = (96 - rail * 84) + '%';
     nextMarkers.add(marker);
   }
