@@ -1,4 +1,5 @@
 import { sceneProp } from './remix.mjs';
+import { physicalButtons } from './controls.mjs';
 
 const W = 480;
 const H = 192;
@@ -456,13 +457,21 @@ function actor(g, x, y, character, lane, energy, scene) {
   g.restore();
 }
 
-function drawSignal(g, sprite, x, y, scale, color, ringCue) {
+function drawSignal(g, sprite, lane, x, y, scale, color, ringCue) {
   g.save();
   g.translate(Math.round(x), Math.round(y));
   if (ringCue) ring(g, 0, 0, 14 * scale, color, 2);
   g.scale(ringCue ? 1 : scale, ringCue ? 1 : scale);
   sprites[sprite](g);
   g.restore();
+
+  const button = physicalButtons[lane];
+  const radius = button.size === 'big' ? 9 : 6;
+  const iconY = Math.max(radius + 3, y - 23);
+  disc(g, x, iconY + 2, radius + 2, ink);
+  disc(g, x, iconY, radius + 1.5, paper);
+  disc(g, x, iconY, radius, button.color);
+  disc(g, x - radius * .3, iconY - radius * .37, radius * .28, '#ffffffa8');
 }
 
 export class Arena {
@@ -505,16 +514,23 @@ export class Arena {
     const current = this.action?.side === side ? this.action : null;
     const age = current ? (now - current.now) / 365 : 1;
     const energy = age < 1 ? Math.sin(Math.max(0, age) * Math.PI) : 0;
-    if (path !== 'side') {
-      for (const [tx, ty] of targets) ring(g, tx, ty, 13, this.scene.color + '88', 1);
-    }
+    for (const [tx, ty] of targets) ring(g, tx, ty, 13, this.scene.color + '99', 1);
     actor(g, x, y, character, current?.lane, energy, this.scene.id);
+    const upcoming = cues.findLast(cue => cue.progress <= 1) ?? cues.at(-1);
+    if (upcoming) {
+      const prop = sceneProp(this.scene, upcoming.obstacle.actionLane);
+      const [tx, ty] = targets[this.scene.props.indexOf(prop)];
+      const color = physicalButtons[upcoming.obstacle.lane].color;
+      ring(g, tx, ty, 15, ink, 5);
+      ring(g, tx, ty, 15, paper, 3);
+      ring(g, tx, ty, 19 - Math.min(1, upcoming.progress) * 2, color, 2);
+    }
     for (const { obstacle, progress } of cues) {
       const prop = sceneProp(this.scene, obstacle.actionLane);
       if (!prop) continue;
       const slot = this.scene.props.indexOf(prop);
       const [sx, sy, scale] = signalPosition(this.scene.id, slot, Math.min(progress, 1));
-      drawSignal(g, prop[1], sx, sy, scale, this.scene.color, path === 'ring');
+      drawSignal(g, prop[1], obstacle.lane, sx, sy, scale, this.scene.color, path === 'ring');
     }
     if (current?.scored && age < 1) this.effect(current.lane, age);
     g.restore();
