@@ -6,7 +6,7 @@ import { Playback } from './playback.mjs';
 import { levels, sceneProp } from './remix.mjs';
 import { Arena } from './arena.mjs';
 import { MenuMusic } from './menu-music.mjs';
-import { physicalButtons, defaultBindings, bindingMap, readBindings, assignBinding, buttonIcon, buttonLayout, describeCode } from './controls.mjs';
+import { physicalButtons, defaultBindings, bindingMap, readBindings, assignBinding, buttonIcon, describeCode } from './controls.mjs';
 
 const bindingStorage = 'festival-controller-bindings';
 const modeStorage = 'festival-button-mode';
@@ -124,7 +124,7 @@ function render() {
       const marker = document.createElement('span');
       marker.className = 'timing-note';
       marker.dataset.demo = obstacle.demo;
-      marker.innerHTML = buttonLayout(obstacle.lane, round.buttonMode);
+      marker.innerHTML = buttonIcon(obstacle.lane);
       marker.hidden = true;
       timingNotes.append(marker);
       return { ...obstacle, marker };
@@ -463,8 +463,8 @@ function drawArena(time, turn) {
     if (obstacle.scene !== currentScene || obstacle.side !== visibleSide) continue;
     if (turn && obstacle.demo && time >= turn.prepare) continue;
     const scored = obstacle.note?.result && obstacle.note.result !== 'MISS';
-    const earlyResponse = !!turn && !obstacle.demo && time < turn.prepare;
-    if (!earlyResponse && !scored) {
+    if (turn && !obstacle.demo && time < turn.prepare) continue;
+    if (!scored) {
       const progress = approachProgress(obstacle, time, preview);
       if (progress !== null) cues.push({ obstacle, progress });
     }
@@ -472,7 +472,6 @@ function drawArena(time, turn) {
     if (rail === null || time >= obstacle.at) continue;
     const marker = obstacle.marker;
     marker.hidden = false;
-    marker.classList.toggle('preview', earlyResponse);
     marker.style.left = (96 - rail * 84) + '%';
     nextMarkers.add(marker);
   }
