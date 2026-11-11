@@ -460,18 +460,23 @@ function actor(g, x, y, character, lane, energy, scene) {
 function drawSignal(g, sprite, lane, x, y, scale, color, ringCue) {
   g.save();
   g.translate(Math.round(x), Math.round(y));
-  if (ringCue) ring(g, 0, 0, 14 * scale, color, 2);
+  if (ringCue) ring(g, 0, 0, 9 * scale, color, 1.5);
   g.scale(ringCue ? 1 : scale, ringCue ? 1 : scale);
   sprites[sprite](g);
   g.restore();
 
   const button = physicalButtons[lane];
-  const radius = button.size === 'big' ? 9 : 6;
-  const iconY = Math.max(radius + 3, y - 23);
-  disc(g, x, iconY + 2, radius + 2, ink);
-  disc(g, x, iconY, radius + 1.5, paper);
-  disc(g, x, iconY, radius, button.color);
-  disc(g, x - radius * .3, iconY - radius * .37, radius * .28, '#ffffffa8');
+  const badgeScale = ringCue ? 1 : Math.min(scale, 1);
+  const radius = button.size === 'big' ? 4.2 : 3.1;
+  const iconY = Math.max(8 * badgeScale, y - 21 * badgeScale);
+  g.save();
+  g.translate(x, iconY);
+  g.scale(badgeScale, badgeScale);
+  polygon(g, [[-6, -6], [6, -6], [7, 4], [2, 5], [0, 8], [-2, 5], [-7, 4]], ink);
+  polygon(g, [[-5.5, -5.5], [5.5, -5.5], [5.5, 3.5], [1.5, 3.5], [0, 6], [-1.5, 3.5], [-5.5, 3.5]], paper);
+  disc(g, 0, -.7, radius, button.color);
+  disc(g, -radius * .3, -radius * .6, radius * .25, '#ffffffa8');
+  g.restore();
 }
 
 export class Arena {
@@ -514,16 +519,16 @@ export class Arena {
     const current = this.action?.side === side ? this.action : null;
     const age = current ? (now - current.now) / 365 : 1;
     const energy = age < 1 ? Math.sin(Math.max(0, age) * Math.PI) : 0;
-    for (const [tx, ty] of targets) ring(g, tx, ty, 13, this.scene.color + '99', 1);
+    for (const [tx, ty] of targets) ring(g, tx, ty, 9, this.scene.color + '99', 1);
     actor(g, x, y, character, current?.lane, energy, this.scene.id);
     const upcoming = cues.findLast(cue => cue.progress <= 1) ?? cues.at(-1);
     if (upcoming) {
       const prop = sceneProp(this.scene, upcoming.obstacle.actionLane);
       const [tx, ty] = targets[this.scene.props.indexOf(prop)];
       const color = physicalButtons[upcoming.obstacle.lane].color;
-      ring(g, tx, ty, 15, ink, 5);
-      ring(g, tx, ty, 15, paper, 3);
-      ring(g, tx, ty, 19 - Math.min(1, upcoming.progress) * 2, color, 2);
+      ring(g, tx, ty, 11, ink, 3);
+      ring(g, tx, ty, 11, paper, 1.5);
+      ring(g, tx, ty, 14 - Math.min(1, upcoming.progress) * 2, color, 1.5);
     }
     for (const { obstacle, progress } of cues) {
       const prop = sceneProp(this.scene, obstacle.actionLane);
