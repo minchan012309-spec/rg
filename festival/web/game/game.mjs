@@ -1,15 +1,20 @@
 import { createRound, press, advance, keyMap, playerKeys } from './rhythm.mjs';
 import { FestivalCloud } from '../shared/cloud.mjs';
 import { title } from './title.mjs';
-import { moves, course, obstaclePosition } from './course.mjs';
+import { moves, course, approachProgress } from './course.mjs';
 import { Playback } from './playback.mjs';
 import { levels, sceneProp } from './remix.mjs';
 import { Arena } from './arena.mjs';
+import { MenuMusic } from './menu-music.mjs';
 
 const get = id => document.getElementById(id);
 const screen = get('screen');
 const guide = get('guide');
 const cloud = new FestivalCloud('festival-station');
+const menuMusic = new MenuMusic();
+const musicMenus = ['home', 'songs', 'levels', 'characters'];
+addEventListener('pointerdown', () => menuMusic.unlock(), { capture: true });
+addEventListener('keydown', () => menuMusic.unlock(), { capture: true });
 const loadTrack = source => fetch(source).then(response => {
   if (!response.ok) throw new Error('음원 파일을 찾을 수 없습니다.');
   return response.arrayBuffer();
@@ -52,6 +57,7 @@ const audioError = message => { guide.textContent = message; };
 function show(next, index = 0) {
   page = next;
   focus = index;
+  menuMusic.update(musicMenus.includes(next));
   render();
 }
 
@@ -90,7 +96,7 @@ function render() {
       '"><b></b><small></small></span>').join('');
     screen.innerHTML = '<section class="game"><div class="hud">' + meters +
       '</div><div class="stage course-stage" id="stage"><div class="stage-top"><strong id="scene-name"></strong><div id="phase"></div><span id="clock"></span></div>' +
-      '<canvas class="arena" id="arena"></canvas><div class="stage-bottom"><span id="cue"></span><strong id="judgement"></strong>' +
+      '<canvas class="arena" id="arena"></canvas><div id="prep-callout" class="prep-callout" hidden></div><div class="stage-bottom"><span id="cue"></span><strong id="judgement"></strong>' +
       '</div><section class="pause-overlay" id="pause-overlay" hidden aria-label="일시정지"></section></div><div class="control-deck"><div class="console" id="pads">' + pads + '</div><span id="last-input"></span></div></section>';
     arena = new Arena(get('arena'));
     obstacles = course(round);
@@ -259,6 +265,7 @@ function sound(lane, at, destination) {
 async function start() {
   if (starting || page === 'play') throw new Error('이미 게임을 진행 중입니다.');
   starting = true;
+  menuMusic.update(false);
   try {
     playback ??= new Playback();
     await playback.load(() => loadTrack(songs[selected].audio));
@@ -275,6 +282,7 @@ async function start() {
     requestAnimationFrame(tick);
   } finally {
     starting = false;
+    menuMusic.update(musicMenus.includes(page));
   }
 }
 
@@ -353,13 +361,14 @@ function drawArena(time, turn) {
   const cues = [];
   for (const obstacle of obstacles) {
     if (obstacle.scene !== currentScene || obstacle.side !== visibleSide) continue;
-    if (turn && (obstacle.demo ? time >= turn.response : time < turn.response - turn.beat)) continue;
+    if (turn && obstacle.demo && time >= turn.prepare) continue;
+    if (turn && !obstacle.demo && time < turn.response && obstacle.approachStart == null) continue;
     if (obstacle.note?.result && obstacle.note.result !== 'MISS') continue;
-    const position = obstaclePosition(obstacle, time, preview);
-    if (position === null) continue;
+    const progress = approachProgress(obstacle, time, preview);
+    if (progress === null) continue;
     cues.push({
       obstacle,
-      progress: Math.min(1, 1 - position / preview),
+      progress,
       key: playerKeys[obstacle.side][obstacle.lane],
     });
   }
@@ -385,10 +394,17 @@ function tick() {
     }
     const index = round.turns.findIndex(turn => time >= turn.start && time < turn.end);
     const turn = round.turns[index];
+    const preparing = turn && time >= turn.prepare && time < turn.response;
+    get('prep-callout').hidden = !preparing;
     if (turn) changeScene(turn.scene);
     if (!turn) {
       const closing = time >= round.turns.at(-1).end;
       phase(closing ? 'end' : 'wait', null, closing ? '곡 마무리' : '준비!', songs[selected].name);
+    } else if (preparing) {
+      const count = 1 + turn.prepTicks.filter(beat => beat > time).length;
+      const key = playerKeys[turn.player][turn.notes[0].lane];
+      phase(index + 'prep' + count, turn.player, playerName(turn.player) + ' · 준비 ' + count, '첫 키  ' + key);
+      get('prep-callout').textContent = '첫 키  ' + key;
     } else if (time < turn.response) {
       const demo = turn.demonstrations.findLastIndex(start => start <= time);
       const label = demo < 0 ? '준비' : '시범 ' + (demo + 1) + ' / ' + turn.demonstrations.length;

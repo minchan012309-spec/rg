@@ -12,7 +12,8 @@ export function course(round) {
       at: note.demoTimes[index], lane: note.lane, side: turn.player,
       demo: true, beat: turn.beat, note: null, scene: turn.scene,
     }))),
-    ...turn.notes.map(note => ({
+    ...turn.notes.map((note, index) => ({
+      approachStart: index === 0 && turn.prepare < turn.response ? turn.prepare : null,
       at: note.time, lane: note.lane, side: turn.player,
       demo: false, beat: turn.beat, note, scene: turn.scene,
     })),
@@ -22,4 +23,14 @@ export function course(round) {
 export function obstaclePosition(obstacle, time, preview = 1.55) {
   const delta = (obstacle.at - time) / obstacle.beat;
   return delta > preview || delta < -.65 ? null : delta;
+}
+
+
+export function approachProgress(obstacle, time, preview) {
+  if (obstacle.approachStart != null) {
+    if (time < obstacle.approachStart || time > obstacle.at + obstacle.beat * .65) return null;
+    return Math.min(1, (time - obstacle.approachStart) / (obstacle.at - obstacle.approachStart));
+  }
+  const position = obstaclePosition(obstacle, time, preview);
+  return position === null ? null : Math.min(1, 1 - position / preview);
 }

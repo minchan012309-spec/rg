@@ -55,7 +55,8 @@ def chart(source, number, name, nominal_period):
     times, flux, duration = onset_strength(source)
     grid, period = fit_grid(times, flux, duration, nominal_period)
     first = int(np.searchsorted(grid, .55))
-    beats_per_turn = 12
+    prep_beats = 2
+    beats_per_turn = 12 + prep_beats
     available = len(grid) - first - 1
     pairs = available // (2 * beats_per_turn)
     spare_pairs = available // 2 - pairs * beats_per_turn
@@ -79,7 +80,7 @@ def chart(source, number, name, nominal_period):
     print(f"{name}: {60 / period:.2f} BPM, {len(turns)} turns, "
           f"{turns[0]['start']:.2f}s–{turns[-1]['beats'][-1]:.2f}s of {duration:.2f}s")
     return dict(id=f"bgm{number}", name=name, duration=round(duration, 4),
-                bpm=round(60 / period, 1), scoreCap=16000, demoRepeats=2, sceneOffset=[0, 8, 15][number - 1], audio=f"audio/{target.name}", turns=turns)
+                bpm=round(60 / period, 1), scoreCap=16000, demoRepeats=2, prepBeats=prep_beats, sceneOffset=[0, 8, 15][number - 1], audio=f"audio/{target.name}", turns=turns)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { moves, course, obstaclePosition } from '../web/game/course.mjs';
+import { moves, course, obstaclePosition, approachProgress } from '../web/game/course.mjs';
 import { createRound } from '../web/game/rhythm.mjs';
 
 test('the same obstacle reaches the line in demonstration and response four beats apart', () => {
@@ -30,4 +30,23 @@ test('two full demonstrations play in order before the response can score', () =
   assert.equal(turn.response, 5);
   assert.deepEqual(course(round).map(({ at, lane }) => [at, lane]),
     [[1, 0], [2, 1], [3, 0], [4, 1], [5, 0], [6, 1]]);
+});
+
+test('first response cue uses both preparation beats even on hard', () => {
+  const round = createRound({
+    demoRepeats: 2,
+    prepBeats: 2,
+    turns: [{ start: 1, beat: .5, beats: Array.from({ length: 15 }, (_, i) => 1 + i * .5),
+      hits: [[0, 0], [2, 1]] }],
+  }, 'hard');
+  const turn = round.turns[0];
+  assert.deepEqual(turn.demonstrations, [1, 3]);
+  assert.equal(turn.prepare, 5);
+  assert.equal(turn.response, 6);
+  const first = course(round).find(obstacle => !obstacle.demo);
+  assert.equal(first.approachStart, 5);
+  assert.equal(approachProgress(first, 4.99, round.profile.preview), null);
+  assert.equal(approachProgress(first, 5, round.profile.preview), 0);
+  assert.equal(approachProgress(first, 5.5, round.profile.preview), .5);
+  assert.equal(approachProgress(first, 6, round.profile.preview), 1);
 });
