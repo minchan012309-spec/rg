@@ -1,0 +1,3 @@
+/dist/
+/web/game/audio/*.mp3
+__pycache__/

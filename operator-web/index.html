@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>축제 리듬게임 운영</title>
+<link rel="stylesheet" href="./fonts.css">
+<link rel="stylesheet" href="./admin.css">
+<script type="module" src="./admin.mjs"></script>
+</head>
+<body>
+<header><div><h1>축제 리듬게임 운영</h1><p id="status" role="status">관리자 로그인이 필요합니다.</p></div><button id="logout" hidden>로그아웃</button></header>
+<main>
+<form id="login" class="card">
+  <h2>관리자 로그인</h2>
+  <label>Supabase URL<input type="url" name="url" required placeholder="https://프로젝트.supabase.co"></label>
+  <label>Publishable 키<input name="key" required autocomplete="off"></label>
+  <label>이메일<input type="email" name="email" required autocomplete="username"></label>
+  <label>비밀번호<input type="password" name="password" required autocomplete="current-password"></label>
+  <button class="primary">로그인</button>
+</form>
+<div id="console" hidden>
+  <section class="card">
+    <h2>게임 제어</h2>
+    <p id="game-state"></p>
+    <label>곡 선택<select id="song"><option value="bgm1">Remix 10</option><option value="bgm2">Remix 6</option><option value="bgm3">Remix 4</option></select></label>
+    <div class="controls"><button data-command="select">곡 보내기</button><button class="primary" data-command="start">게임 시작</button><button data-command="pause">일시정지</button><button data-command="resume">재개</button></div>
+    <p id="receipt" role="status"></p>
+  </section>
+  <form id="roster" class="card">
+    <h2>다음 경기 참가자</h2>
+    <label>팀 이름<input name="team" maxlength="40"></label>
+    <fieldset><legend>플레이어 1</legend><label>학번<input name="student1" maxlength="30" inputmode="numeric"></label><label>이름<input name="name1" maxlength="40"></label></fieldset>
+    <fieldset><legend>플레이어 2</legend><label>학번<input name="student2" maxlength="30" inputmode="numeric"></label><label>이름<input name="name2" maxlength="40"></label></fieldset>
+    <button class="primary">참가자 저장</button>
+    <p id="roster-info" role="status"></p>
+  </form>
+  <form id="scores" class="card">
+    <h2>기록 점수 입력</h2>
+    <label>완료 경기<select name="match" required></select></label>
+    <div class="controls">
+      <label>플레이어 1 점수<input type="number" name="score1" min="0" max="16000" required></label>
+      <label>플레이어 2 점수<input type="number" name="score2" min="0" max="16000" required></label>
+    </div>
+    <div class="controls"><button class="primary">점수 저장</button><button type="button" id="refresh">경기 새로고침</button></div>
+    <p id="score-info" role="status"></p>
+  </form>
+</div>
+</main>
+</body>
+</html>

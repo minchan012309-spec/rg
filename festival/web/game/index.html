@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RHYTHM DUEL</title>
+<link rel="icon" href="./icon.png">
+<link rel="stylesheet" href="../shared/fonts.css">
+<link rel="stylesheet" href="./game.css">
+<script type="module" src="./game.mjs"></script>
+</head>
+<body>
+<header>
+  <button class="brand" id="home"><img src="./icon.png" alt=""><span data-title>RHYTHM DUEL</span></button>
+  <div class="head-controls"><span id="network">로컬 플레이</span><button id="settings">운영 연결</button><button id="fullscreen" aria-label="전체 화면">⛶</button></div>
+</header>
+<main id="screen" aria-live="off"></main>
+<footer id="guide"></footer>
+<dialog id="connection">
+  <form id="station-login">
+    <h2>게임 PC 연결</h2>
+    <label>Supabase URL<input name="url" type="url" required></label>
+    <label>Publishable 키<input name="key" required></label>
+    <label>게임 PC 이메일<input name="email" type="email" required></label>
+    <label>비밀번호<input name="password" type="password" required></label>
+    <p id="connection-error" role="status"></p>
+    <div class="actions"><button>연결</button><button type="button" id="disconnect">연결 해제</button><button type="button" id="close">닫기</button></div>
+  </form>
+</dialog>
+</body>
+</html>
