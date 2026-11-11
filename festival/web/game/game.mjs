@@ -6,7 +6,7 @@ import { Playback } from './playback.mjs';
 import { levels, sceneProp } from './remix.mjs';
 import { Arena } from './arena.mjs';
 import { MenuMusic } from './menu-music.mjs';
-import { physicalButtons, defaultBindings, bindingMap, readBindings, assignBinding, buttonIcon, describeCode } from './controls.mjs';
+import { physicalButtons, defaultBindings, bindingMap, readBindings, assignBinding, buttonIcon, buttonLayout, describeCode } from './controls.mjs';
 
 const bindingStorage = 'festival-controller-bindings';
 const modeStorage = 'festival-button-mode';
@@ -61,7 +61,7 @@ let autoPlay = localStorage.getItem('festival-autoplay') === 'on';
 let autoSince = 0, exhibition = false;
 let lastPhase = '', lastCueNote, lastTurnIndex = -1, judgementTimer, recentInput = -Infinity;
 let visibleTimingNotes = new Set();
-let obstacles = [], demos = [], responses = [], nextSound = 0, nextMove = 0, nextBeatSound = 0, nextBeatPulse = 0;
+let obstacles = [], demos = [], responses = [], nextSound = 0, nextMove = 0, nextBeatSound = 0, nextRailBurst = 0;
 const padTimers = new Map();
 
 let boardEntries = [], rosterAtStart = '', projectAtStart = '';
@@ -123,7 +123,7 @@ function render() {
       const marker = document.createElement('span');
       marker.className = 'timing-note';
       marker.dataset.demo = obstacle.demo;
-      marker.innerHTML = buttonIcon(obstacle.lane);
+      marker.innerHTML = buttonLayout(obstacle.lane, round.buttonMode);
       marker.hidden = true;
       timingNotes.append(marker);
       return { ...obstacle, marker };
@@ -131,7 +131,7 @@ function render() {
     visibleTimingNotes.clear();
     demos = obstacles.filter(obstacle => obstacle.demo);
     responses = obstacles.filter(obstacle => !obstacle.demo);
-    nextSound = nextMove = nextBeatSound = nextBeatPulse = 0;
+    nextSound = nextMove = nextBeatSound = nextRailBurst = 0;
     currentScene = null;
     visibleSide = 0;
     changeScene(round.turns[0].scene);
@@ -435,14 +435,14 @@ function drawArena(time, turn) {
   for (const obstacle of obstacles) {
     if (obstacle.scene !== currentScene || obstacle.side !== visibleSide) continue;
     if (turn && obstacle.demo && time >= turn.prepare) continue;
-    if (obstacle.note?.result && obstacle.note.result !== 'MISS') continue;
+    const scored = obstacle.note?.result && obstacle.note.result !== 'MISS';
     const earlyResponse = !!turn && !obstacle.demo && time < turn.prepare;
-    if (!earlyResponse) {
+    if (!earlyResponse && !scored) {
       const progress = approachProgress(obstacle, time, preview);
       if (progress !== null) cues.push({ obstacle, progress });
     }
     const rail = railProgress(obstacle.at, time, travel);
-    if (rail === null) continue;
+    if (rail === null || time >= obstacle.at) continue;
     const marker = obstacle.marker;
     marker.hidden = false;
     marker.classList.toggle('preview', earlyResponse);
@@ -456,6 +456,18 @@ function drawArena(time, turn) {
   }
   visibleTimingNotes = nextMarkers;
   arena.draw(time, visibleSide, chosen[visibleSide], cues, performance.now());
+}
+
+function burstAtTarget(lane) {
+  const effect = document.createElement('span');
+  effect.className = 'timing-burst';
+  effect.setAttribute('aria-hidden', 'true');
+  effect.style.setProperty('--burst', physicalButtons[lane].color);
+  effect.innerHTML = '<i class="burst-wave"></i>' + Array.from({ length: 8 }, (_, index) =>
+    '<i class="burst-particle" style="--angle:' + index * 45 + 'deg"></i>').join('');
+  get('timing-rail').append(effect);
+  effect.addEventListener('animationend', () => effect.remove(), { once: true });
+  setTimeout(() => effect.remove(), 400);
 }
 
 function tick() {
@@ -476,12 +488,9 @@ function tick() {
       const beat = responses[nextBeatSound++];
       if (beatGuide) guideClick(playback.cueTime(beat.at));
     }
-    while (nextBeatPulse < responses.length && responses[nextBeatPulse].at <= time) {
-      const beat = responses[nextBeatPulse++];
-      if (time - beat.at < .12) {
-        get('timing-target').animate([{ scale: '1.16', opacity: 1 }, { scale: '1', opacity: .8 }],
-          { duration: 180, easing: 'ease-out' });
-      }
+    while (nextRailBurst < obstacles.length && obstacles[nextRailBurst].at <= time) {
+      const beat = obstacles[nextRailBurst++];
+      if (time - beat.at < .12) burstAtTarget(beat.lane);
     }
     const index = round.turns.findIndex(turn => time >= turn.start && time < turn.end);
     const turn = round.turns[index];
@@ -640,7 +649,8 @@ async function setPause(next) {
   if (next) {
     playback.pause();
     nextSound = nextMove;
-    nextBeatSound = nextBeatPulse;
+    const upcomingBeat = responses.findIndex(beat => beat.at > playback.time);
+    nextBeatSound = upcomingBeat < 0 ? responses.length : upcomingBeat;
   } else playback.resume();
   paused = next;
   confirmingQuit = false;

@@ -50,3 +50,11 @@ export function buttonIcon(lane) {
 export function describeCode(code) {
   return code.replace(/^Key|^Digit/, '').replace('Arrow', '방향키 ').replace('Numpad', '숫자패드 ');
 }
+
+export function buttonLayout(lane, mode) {
+  const count = mode === 'domes' ? 2 : 5;
+  return '<span class="button-layout" role="img" aria-label="' + physicalButtons[lane].name + '">' +
+    physicalButtons.slice(0, count).map((button, index) =>
+      '<i class="layout-slot slot-' + index + (index === lane ? ' on' : '') +
+      '" style="--cap:' + button.color + '"></i>').join('') + '</span>';
+}
