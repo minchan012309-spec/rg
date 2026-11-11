@@ -96,7 +96,7 @@ input{width:100%;padding:10px;background:var(--ink);color:var(--paper);border:1p
 .pause-panel h2{font-size:49px;letter-spacing:-.07em}.pause-panel p{color:var(--muted);margin-top:12px}
 .pause-panel .quit{border-color:var(--pink);color:var(--pink)}
 .prep-callout{position:absolute;top:63px;left:50%;translate:-50% 0;padding:7px 16px;border:2px solid var(--accent,var(--paper));background:#171327e8;color:var(--accent,var(--paper));font-size:31px;pointer-events:none;z-index:2}
-.course-stage{grid-template-rows:auto 76px minmax(0,1fr) auto}
+.course-stage{grid-template-rows:50px 76px minmax(0,1fr) 52px}
 .button-icon{--diameter:22px;display:inline-block;flex:0 0 auto;width:var(--diameter);height:var(--diameter);vertical-align:middle;border:2px solid #fbf4df;border-radius:50%;background:radial-gradient(circle at 35% 26%,#fff9 0 13%,transparent 17%),var(--cap);box-shadow:inset 0 -4px #12132945,0 2px #080916}
 .button-icon.big{--diameter:33px}
 .timing-rail{position:relative;overflow:hidden;background:repeating-linear-gradient(90deg,transparent 0 69px,#b4a3c020 70px 71px),#241e36;border-bottom:2px solid #51435e}

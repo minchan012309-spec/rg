@@ -414,7 +414,7 @@ function drawArena(time, turn) {
   for (const obstacle of obstacles) {
     if (obstacle.scene !== currentScene || obstacle.side !== visibleSide) continue;
     if (turn && obstacle.demo && time >= turn.prepare) continue;
-    if (turn && !obstacle.demo && time < turn.response && obstacle.approachStart == null) continue;
+    if (turn && !obstacle.demo && time < turn.prepare) continue;
     if (obstacle.note?.result && obstacle.note.result !== 'MISS') continue;
     const progress = approachProgress(obstacle, time, preview);
     if (progress === null) continue;
