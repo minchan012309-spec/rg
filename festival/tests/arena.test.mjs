@@ -9,7 +9,7 @@ test('all twenty scenes use distinct arena paths and meet the target exactly on 
     const arena = arenas[scene.id];
     const positions = [.2, .6, 1].map(progress => signalPosition(scene.id, 0, progress));
     paths.add(JSON.stringify(positions));
-    assert.deepEqual(positions.at(-1).slice(0, 2), arena.targets[1]);
+    assert.deepEqual(positions.at(-1).slice(0, 2), arena.targets[0]);
     assert.notDeepEqual(positions[0], positions[2]);
     assert.ok(scene.props.every(([, name]) => /^[a-z-]+$/.test(name)));
   }
@@ -33,4 +33,9 @@ test('wide and narrow arena containers preserve sprite proportions and keep the 
   assert.ok(Math.abs(narrow.width / narrow.height - 960 / 550) < .006);
   assert.equal(narrow.width, 480);
   assert.ok(narrow.y > 0 && narrow.x === 0);
+});
+
+test('drum actions reach three separate spots on the beat', () => {
+  assert.deepEqual([0, 1, 2].map(slot => signalPosition('drums', slot, 1).slice(0, 2)),
+    [[148, 132], [240, 132], [332, 132]]);
 });

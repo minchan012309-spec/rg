@@ -5,7 +5,7 @@ function beatTime(beats, step) {
   return beats[i] + (beats[i + 1] - beats[i]) * (step - i);
 }
 
-export function createRound(song, level = 'soft') {
+export function createRound(song, level = 'soft', buttonMode = 'five') {
   const standard = levels.find(item => item.id === level) ?? levels[0];
   const denseHard = song.id === 'bgm3' && standard.id === 'hard';
   const profile = denseHard ? { ...standard, good: .082, perfect: .038, preview: 1.55 } : standard;
@@ -26,8 +26,8 @@ export function createRound(song, level = 'soft') {
     return {
       ...turn, player, scene: arranged.scene, hits, demonstrations, prepare: beats[prepareBeat], prepTicks: beats.slice(prepareBeat, responseBeat),
       response: beats[responseBeat], end: beats.at(-1),
-      notes: hits.map(([step, lane]) => ({
-        lane, time: beatTime(beats, responseBeat + step),
+      notes: hits.map(([step, actionLane], noteIndex) => ({
+        lane: buttonMode === 'domes' ? noteIndex % 2 : actionLane, actionLane, time: beatTime(beats, responseBeat + step),
         demoTimes: demonstrations.map((_, i) => beatTime(beats, lead + phraseBeats * i + step)),
         result: null,
       })),
@@ -35,7 +35,7 @@ export function createRound(song, level = 'soft') {
   });
   const maxScores = song.scoreCap ? [song.scoreCap, song.scoreCap] : [...rawMax];
   return {
-    turns, profile, maxScores, rawMax, raw: [0, 0], scores: [0, 0],
+    turns, profile, buttonMode, maxScores, rawMax, raw: [0, 0], scores: [0, 0],
     end: song.duration ?? turns.at(-1).end + .35,
   };
 }
@@ -71,5 +71,6 @@ export function press(round, player, lane, time) {
   round.raw[player] += perfect ? 1000 : 650;
   round.scores[player] = Math.round(round.raw[player] * round.maxScores[player] / round.rawMax[player]);
   note.result = perfect ? 'PERFECT' : 'GOOD';
+  round.lastHit = note;
   return note.result;
 }

@@ -9,12 +9,12 @@ export const moves = [
 export function course(round) {
   return round.turns.flatMap(turn => [
     ...turn.demonstrations.flatMap((_, index) => turn.notes.map(note => ({
-      at: note.demoTimes[index], lane: note.lane, side: turn.player,
+      at: note.demoTimes[index], lane: note.lane, actionLane: note.actionLane, side: turn.player,
       demo: true, beat: turn.beat, note: null, scene: turn.scene,
     }))),
     ...turn.notes.map((note, index) => ({
       approachStart: index === 0 && turn.prepare < turn.response ? turn.prepare : null,
-      at: note.time, lane: note.lane, side: turn.player,
+      at: note.time, lane: note.lane, actionLane: note.actionLane, side: turn.player,
       demo: false, beat: turn.beat, note, scene: turn.scene,
     })),
   ]);

@@ -9,6 +9,8 @@ import { MenuMusic } from './menu-music.mjs';
 import { physicalButtons, defaultBindings, bindingMap, readBindings, assignBinding, buttonIcon, describeCode } from './controls.mjs';
 
 const bindingStorage = 'festival-controller-bindings';
+const modeStorage = 'festival-button-mode';
+let buttonMode = localStorage.getItem(modeStorage) === 'domes' ? 'domes' : 'five';
 let bindings = readBindings(localStorage.getItem(bindingStorage));
 let keyMap = bindingMap(bindings);
 let bindingDraft, captureTarget;
@@ -248,6 +250,7 @@ document.addEventListener('keydown', event => {
     if (!mapped) return;
     event.preventDefault();
     const [side, lane] = mapped;
+    if (round.buttonMode === 'domes' && lane > 1) return;
     const now = performance.now();
     const eventTime = event.timeStamp >= 0 && event.timeStamp <= now ? event.timeStamp : now;
     hitButton(side, lane, playback.timeAt(eventTime) - inputOffset / 1000);
@@ -269,10 +272,11 @@ document.addEventListener('keydown', event => {
 
 function hitButton(side, lane, time, automated = false) {
   recentInput = performance.now();
-  flash(side, lane, true);
-  sound(lane);
   const result = press(round, side, lane, time);
-  arena.strike(side, lane, !!result, recentInput);
+  const actionLane = result ? round.lastHit.actionLane : lane;
+  flash(side, lane, true, actionLane);
+  sound(actionLane);
+  arena.strike(side, actionLane, !!result, recentInput);
   const responding = round.turns.some(turn =>
     turn.player === side && time >= turn.response && time < turn.end);
   feedback(result || (responding ? 'MISS' : '입력'), lane);
@@ -314,7 +318,7 @@ async function start() {
     rosterAtStart = roster.team;
     projectAtStart = cloud.session ? cloud.config.url : null;
     matchId = crypto.randomUUID();
-    round = createRound(songs[selected], levels[level].id);
+    round = createRound(songs[selected], levels[level].id, buttonMode);
     paused = false;
     autoSince = 0;
     exhibition = false;
@@ -346,7 +350,7 @@ function feedback(text, lane = null) {
   judgementTimer = setTimeout(() => { judgement.textContent = ''; }, 480);
 }
 
-function flash(side, lane, input = false) {
+function flash(side, lane, input = false, actionLane = lane) {
   if (side === visibleSide) {
     const pad = get('pad' + lane);
     pad.classList.add('lit');
@@ -355,7 +359,8 @@ function flash(side, lane, input = false) {
   }
   if (!input) return;
   const indicator = get('last-input');
-  const label = sceneProp(currentScene, lane)?.[2] ?? moves[lane].name;
+  const label = sceneProp(currentScene, actionLane)?.[2] ??
+    (round.buttonMode === 'domes' ? physicalButtons[lane].name : moves[lane].name);
   indicator.innerHTML = '<span>P' + (side + 1) + '</span>' + buttonIcon(lane) + '<span>' + label + '</span>';
   clearTimeout(padTimers.get(indicator));
   padTimers.set(indicator, setTimeout(() => { indicator.textContent = ''; }, 700));
@@ -364,12 +369,15 @@ function flash(side, lane, input = false) {
 function updatePads() {
   const console = get('pads');
   console.dataset.side = visibleSide;
+  console.dataset.mode = round.buttonMode;
   for (let lane = 0; lane < moves.length; lane++) {
     const pad = get('pad' + lane);
     const prop = sceneProp(currentScene, lane);
-    pad.classList.toggle('unused', !prop);
+    const domes = round.buttonMode === 'domes';
+    pad.hidden = domes && lane > 1;
+    pad.classList.toggle('unused', !domes && !prop);
     pad.classList.remove('lit');
-    pad.querySelector('small').textContent = prop?.[2] ?? '';
+    pad.querySelector('small').textContent = domes ? physicalButtons[lane].name : prop?.[2] ?? '';
   }
 }
 
@@ -443,7 +451,7 @@ function tick() {
     }
     while (nextSound < demos.length && demos[nextSound].at <= playback.scheduleThrough) {
       const demo = demos[nextSound++];
-      sound(demo.lane, playback.cueTime(demo.at), playback.demoGain);
+      sound(demo.actionLane, playback.cueTime(demo.at), playback.demoGain);
     }
     const index = round.turns.findIndex(turn => time >= turn.start && time < turn.end);
     const turn = round.turns[index];
@@ -477,7 +485,7 @@ function tick() {
         '타이밍 바의 원에 버튼 아이콘이 겹치면 누르세요');
       const upcoming = turn.notes.find(note => !note.result);
       if ((upcoming ?? null) !== lastCueNote) {
-        const prop = upcoming && sceneProp(turn.scene, upcoming.lane);
+        const prop = upcoming && sceneProp(turn.scene, upcoming.actionLane);
         get('cue').innerHTML = prop ? '다음 ' + buttonIcon(upcoming.lane) + '<span>' + prop[2] + '</span>' : '이번 차례 끝!';
         lastCueNote = upcoming ?? null;
       }
@@ -490,7 +498,7 @@ function tick() {
     if (advance(round, time - Math.max(0, inputOffset) / 1000 - .025) && performance.now() - recentInput > 450) feedback('MISS');
     while (nextMove < demos.length && demos[nextMove].at <= time) {
       const demo = demos[nextMove++];
-      arena.strike(demo.side, demo.lane, true, performance.now());
+      arena.strike(demo.side, demo.actionLane, true, performance.now());
       flash(demo.side, demo.lane);
     }
     drawArena(time, turn);
@@ -683,6 +691,7 @@ function captureBinding(event) {
 get('auto-setting').onchange = event => setAutoPlay(event.target.checked);
 get('button-settings').onclick = () => {
   get('auto-setting').checked = autoPlay;
+  get('button-mode').value = buttonMode;
   get('timing-offset').value = inputOffset;
   get('offset-value').textContent = inputOffset + ' ms';
   bindingDraft = bindings;
@@ -701,6 +710,8 @@ get('binding-grid').onclick = event => {
 };
 get('timing-offset').oninput = event => { get('offset-value').textContent = event.target.value + ' ms'; };
 get('save-bindings').onclick = () => {
+  buttonMode = get('button-mode').value;
+  localStorage.setItem(modeStorage, buttonMode);
   inputOffset = Number(get('timing-offset').value);
   localStorage.setItem(offsetStorage, String(inputOffset));
   bindings = bindingDraft;
@@ -710,6 +721,7 @@ get('save-bindings').onclick = () => {
 };
 get('reset-bindings').onclick = () => {
   bindingDraft = defaultBindings;
+  get('button-mode').value = 'five';
   get('timing-offset').value = 0;
   get('offset-value').textContent = '0 ms';
   captureTarget = null;

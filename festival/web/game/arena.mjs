@@ -33,7 +33,7 @@ export const arenas = {
 
 export function signalPosition(scene, slot, progress) {
   const { targets, path } = arenas[scene];
-  const [x, y] = targets[1];
+  const [x, y] = targets[slot];
   if (progress === 1) return [x, y, 1];
   const p = progress;
   const rest = 1 - p;
@@ -493,7 +493,7 @@ export class Arena {
 
   draw(time, side, character, cues, now) {
     const g = this.g;
-    const { path, actor: [x, y] } = this.layout;
+    const { path, actor: [x, y], targets } = this.layout;
     const frame = arenaFrame(this.canvas.clientWidth, this.canvas.clientHeight);
     if (this.canvas.width !== frame.width || this.canvas.height !== frame.height) {
       this.canvas.width = frame.width;
@@ -505,9 +505,12 @@ export class Arena {
     const current = this.action?.side === side ? this.action : null;
     const age = current ? (now - current.now) / 365 : 1;
     const energy = age < 1 ? Math.sin(Math.max(0, age) * Math.PI) : 0;
+    if (path !== 'side') {
+      for (const [tx, ty] of targets) ring(g, tx, ty, 13, this.scene.color + '88', 1);
+    }
     actor(g, x, y, character, current?.lane, energy, this.scene.id);
     for (const { obstacle, progress } of cues) {
-      const prop = sceneProp(this.scene, obstacle.lane);
+      const prop = sceneProp(this.scene, obstacle.actionLane);
       if (!prop) continue;
       const slot = this.scene.props.indexOf(prop);
       const [sx, sy, scale] = signalPosition(this.scene.id, slot, Math.min(progress, 1));
@@ -521,7 +524,7 @@ export class Arena {
     const g = this.g;
     const prop = sceneProp(this.scene, lane);
     if (!prop) return;
-    const [x, y] = this.layout.targets[1];
+    const [x, y] = this.layout.targets[this.scene.props.indexOf(prop)];
     const { path } = this.layout;
     g.globalAlpha = 1 - age;
     if (path === 'frame') {

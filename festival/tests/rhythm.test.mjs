@@ -113,3 +113,13 @@ test('every recording has a hell level and Remix 4 hard starts at full density',
   assert.ok(remix4.turns.every(turn => turn.hits.length === 4));
   assert.ok(remix4.profile.good < createRound(songs[0], 'hard').profile.good);
 });
+
+test('big-only play keeps the scene actions but judges only the two dome buttons', () => {
+  const round = createRound(chart, 'soft', 'domes');
+  const turn = round.turns[0];
+  assert.deepEqual(turn.notes.map(note => [note.lane, note.actionLane]), [[0,0],[1,1],[0,3],[1,4]]);
+  assert.equal(press(round, 0, 3, 4), null);
+  assert.equal(press(round, 0, 0, 4), 'PERFECT');
+  assert.equal(round.lastHit.actionLane, 3);
+  assert.deepEqual(round.rawMax, [4000, 4000]);
+});
