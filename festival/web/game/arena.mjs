@@ -457,25 +457,38 @@ function actor(g, x, y, character, lane, energy, scene) {
   g.restore();
 }
 
-function drawSignal(g, sprite, lane, x, y, scale, color, ringCue) {
+const tintedSprites = new Map();
+
+function coloredSprite(sprite, color) {
+  const key = sprite + color;
+  if (tintedSprites.has(key)) return tintedSprites.get(key);
+  const image = document.createElement('canvas');
+  image.width = image.height = 44;
+  const g = image.getContext('2d');
+  g.translate(22, 22);
+  sprites[sprite](g);
+  const pixels = g.getImageData(0, 0, 44, 44);
+  const rgb = [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16));
+  for (let i = 0; i < pixels.data.length; i += 4) {
+    if (!pixels.data[i + 3]) continue;
+    const light = .2126 * pixels.data[i] + .7152 * pixels.data[i + 1] + .0722 * pixels.data[i + 2];
+    const shade = .4 + .6 * Math.min(1, light / 205);
+    for (let channel = 0; channel < 3; channel++) pixels.data[i + channel] = rgb[channel] * shade;
+  }
+  g.putImageData(pixels, 0, 0);
+  tintedSprites.set(key, image);
+  return image;
+}
+
+function drawSignal(g, sprite, lane, x, y, scale, ringCue) {
+  const button = physicalButtons[lane];
+  const size = (ringCue ? 1 : scale) * (button.size === 'big' ? 1.12 : .91);
   g.save();
   g.translate(Math.round(x), Math.round(y));
-  if (ringCue) ring(g, 0, 0, 9 * scale, color, 1.5);
-  g.scale(ringCue ? 1 : scale, ringCue ? 1 : scale);
-  sprites[sprite](g);
-  g.restore();
-
-  const button = physicalButtons[lane];
-  const badgeScale = ringCue ? 1 : Math.min(scale, 1);
-  const radius = button.size === 'big' ? 4.2 : 3.1;
-  const iconY = Math.max(8 * badgeScale, y - 21 * badgeScale);
-  g.save();
-  g.translate(x, iconY);
-  g.scale(badgeScale, badgeScale);
-  polygon(g, [[-6, -6], [6, -6], [7, 4], [2, 5], [0, 8], [-2, 5], [-7, 4]], ink);
-  polygon(g, [[-5.5, -5.5], [5.5, -5.5], [5.5, 3.5], [1.5, 3.5], [0, 6], [-1.5, 3.5], [-5.5, 3.5]], paper);
-  disc(g, 0, -.7, radius, button.color);
-  disc(g, -radius * .3, -radius * .6, radius * .25, '#ffffffa8');
+  if (ringCue) ring(g, 0, 0, 9 * scale, button.color, 1.5);
+  g.imageSmoothingEnabled = false;
+  g.scale(size, size);
+  g.drawImage(coloredSprite(sprite, button.color), -22, -22);
   g.restore();
 }
 
@@ -501,8 +514,8 @@ export class Arena {
     this.canvas.setAttribute('aria-label', scene.name + ' 무대');
   }
 
-  strike(side, lane, scored, now) {
-    this.action = { side, lane, scored, now };
+  strike(side, lane, scored, now, buttonLane = lane) {
+    this.action = { side, lane, scored, now, buttonLane };
   }
 
   draw(time, side, character, cues, now) {
@@ -535,18 +548,19 @@ export class Arena {
       if (!prop) continue;
       const slot = this.scene.props.indexOf(prop);
       const [sx, sy, scale] = signalPosition(this.scene.id, slot, Math.min(progress, 1));
-      drawSignal(g, prop[1], obstacle.lane, sx, sy, scale, this.scene.color, path === 'ring');
+      drawSignal(g, prop[1], obstacle.lane, sx, sy, scale, path === 'ring');
     }
-    if (current?.scored && age < 1) this.effect(current.lane, age);
+    if (current?.scored && age < 1) this.effect(current.lane, current.buttonLane, age);
     g.restore();
   }
 
-  effect(lane, age) {
+  effect(lane, buttonLane, age) {
     const g = this.g;
     const prop = sceneProp(this.scene, lane);
     if (!prop) return;
     const [x, y] = this.layout.targets[this.scene.props.indexOf(prop)];
     const { path } = this.layout;
+    const color = physicalButtons[buttonLane].color;
     g.globalAlpha = 1 - age;
     if (path === 'frame') {
       rect(g, 125, 31, 226, 120, '#ffffff55');
@@ -556,16 +570,16 @@ export class Arena {
         const angle = i * Math.PI / 5;
         const radius = 8 + age * 42;
         rect(g, x + Math.cos(angle) * radius, y + Math.sin(angle) * radius, 4, 4,
-          i % 2 ? paper : this.scene.color);
+          i % 2 ? paper : color);
       }
     } else {
       const dx = path === 'pitch' ? (lane % 2 ? -70 : 70) : path === 'side' ? -67 : 16;
       g.save();
       g.translate(x + age * dx, y - Math.sin(Math.PI * age) * 41 - age * 10);
       g.rotate(age * (lane === 4 ? 5 : .9));
-      sprites[prop[1]](g);
+      g.drawImage(coloredSprite(prop[1], color), -22, -22);
       g.restore();
-      ring(g, x, y, 7 + 23 * age, this.scene.color, 2);
+      ring(g, x, y, 7 + 23 * age, color, 2);
     }
     g.globalAlpha = 1;
   }

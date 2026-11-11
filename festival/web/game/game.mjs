@@ -14,6 +14,9 @@ let buttonMode = localStorage.getItem(modeStorage) === 'domes' ? 'domes' : 'five
 let bindings = readBindings(localStorage.getItem(bindingStorage));
 let keyMap = bindingMap(bindings);
 let bindingDraft, captureTarget;
+const railStorage = 'festival-rail-beats';
+const savedRailBeats = Number(localStorage.getItem(railStorage));
+let railBeats = [6, 8, 10].includes(savedRailBeats) ? savedRailBeats : 8;
 const offsetStorage = 'festival-input-offset';
 let inputOffset = Math.max(-200, Math.min(200, Number(localStorage.getItem(offsetStorage)) || 0));
 const get = id => document.getElementById(id);
@@ -278,7 +281,7 @@ function hitButton(side, lane, time, automated = false) {
   const actionLane = result ? round.lastHit.actionLane : lane;
   flash(side, lane, true, actionLane);
   sound(actionLane);
-  arena.strike(side, actionLane, !!result, recentInput);
+  arena.strike(side, actionLane, !!result, recentInput, lane);
   const responding = round.turns.some(turn =>
     turn.player === side && time >= turn.response && time < turn.end);
   feedback(result || (responding ? 'MISS' : '입력'), lane);
@@ -428,7 +431,7 @@ function drawArena(time, turn) {
   const preview = round.profile.preview;
   const cues = [];
   const nextMarkers = new Set();
-  const travel = (turn?.beat ?? round.turns[0].beat) * 4;
+  const travel = (turn?.beat ?? round.turns[0].beat) * railBeats;
   for (const obstacle of obstacles) {
     if (obstacle.scene !== currentScene || obstacle.side !== visibleSide) continue;
     if (turn && obstacle.demo && time >= turn.prepare) continue;
@@ -525,7 +528,7 @@ function tick() {
     if (advance(round, time - Math.max(0, inputOffset) / 1000 - .025) && performance.now() - recentInput > 450) feedback('MISS');
     while (nextMove < demos.length && demos[nextMove].at <= time) {
       const demo = demos[nextMove++];
-      arena.strike(demo.side, demo.actionLane, true, performance.now());
+      arena.strike(demo.side, demo.actionLane, true, performance.now(), demo.lane);
       flash(demo.side, demo.lane);
     }
     drawArena(time, turn);
@@ -720,6 +723,7 @@ get('auto-setting').onchange = event => setAutoPlay(event.target.checked);
 get('button-settings').onclick = () => {
   get('auto-setting').checked = autoPlay;
   get('button-mode').value = buttonMode;
+  get('rail-speed').value = railBeats;
   get('beat-guide').checked = beatGuide;
   get('timing-offset').value = inputOffset;
   get('offset-value').textContent = inputOffset + ' ms';
@@ -739,6 +743,8 @@ get('binding-grid').onclick = event => {
 };
 get('timing-offset').oninput = event => { get('offset-value').textContent = event.target.value + ' ms'; };
 get('save-bindings').onclick = () => {
+  railBeats = Number(get('rail-speed').value);
+  localStorage.setItem(railStorage, String(railBeats));
   beatGuide = get('beat-guide').checked;
   localStorage.setItem('festival-beat-guide', beatGuide ? 'on' : 'off');
   buttonMode = get('button-mode').value;
@@ -753,6 +759,7 @@ get('save-bindings').onclick = () => {
 get('reset-bindings').onclick = () => {
   bindingDraft = defaultBindings;
   get('button-mode').value = 'five';
+  get('rail-speed').value = 8;
   get('timing-offset').value = 0;
   get('offset-value').textContent = '0 ms';
   captureTarget = null;
