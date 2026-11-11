@@ -1,7 +1,7 @@
 import { createRound, press, advance } from './rhythm.mjs';
 import { FestivalCloud } from '../shared/cloud.mjs';
 import { title } from './title.mjs';
-import { moves, course, approachProgress } from './course.mjs';
+import { moves, course, approachProgress, railProgress } from './course.mjs';
 import { Playback } from './playback.mjs';
 import { levels, sceneProp } from './remix.mjs';
 import { Arena } from './arena.mjs';
@@ -53,11 +53,12 @@ let currentScene, arena, visibleSide = 0;
 let page, focus = 0, selected = 0, choosing = 0, chosen = [0, 1];
 let round, matchId, paused = false, starting = false, currentNames = [], receipt, playback;
 let pauseFocus = 0, confirmingQuit = false;
+let beatGuide = localStorage.getItem('festival-beat-guide') !== 'off';
 let autoPlay = localStorage.getItem('festival-autoplay') === 'on';
 let autoSince = 0, exhibition = false;
 let lastPhase = '', lastCueNote, lastTurnIndex = -1, judgementTimer, recentInput = -Infinity;
 let visibleTimingNotes = new Set();
-let obstacles = [], demos = [], nextSound = 0, nextMove = 0;
+let obstacles = [], demos = [], responses = [], nextSound = 0, nextMove = 0, nextBeatSound = 0, nextBeatPulse = 0;
 const padTimers = new Map();
 
 let boardEntries = [], rosterAtStart = '', projectAtStart = '';
@@ -126,7 +127,8 @@ function render() {
     });
     visibleTimingNotes.clear();
     demos = obstacles.filter(obstacle => obstacle.demo);
-    nextSound = nextMove = 0;
+    responses = obstacles.filter(obstacle => !obstacle.demo);
+    nextSound = nextMove = nextBeatSound = nextBeatPulse = 0;
     currentScene = null;
     visibleSide = 0;
     changeScene(round.turns[0].scene);
@@ -283,8 +285,6 @@ function hitButton(side, lane, time, automated = false) {
   if (!result) return;
   if (automated) exhibition = true;
   updateScores();
-  get('timing-target').animate([{ opacity: 1, scale: '1.22' }, { opacity: .8, scale: '1' }],
-    { duration: 230, easing: 'ease-out' });
 }
 
 function sound(lane, at, destination) {
@@ -305,6 +305,22 @@ function sound(lane, at, destination) {
   oscillator.connect(filter).connect(gain).connect(destination ?? context.destination);
   oscillator.start(now);
   oscillator.stop(now + move.length + .015);
+}
+
+function guideClick(at) {
+  const context = playback.context;
+  const when = Math.max(at, context.currentTime);
+  const click = context.createOscillator();
+  const volume = context.createGain();
+  click.type = 'sine';
+  click.frequency.setValueAtTime(950, when);
+  click.frequency.exponentialRampToValueAtTime(680, when + .027);
+  volume.gain.setValueAtTime(.001, when);
+  volume.gain.linearRampToValueAtTime(.15, when + .002);
+  volume.gain.exponentialRampToValueAtTime(.001, when + .043);
+  click.connect(volume).connect(playback.demoGain);
+  click.start(when);
+  click.stop(when + .045);
 }
 
 async function start() {
@@ -411,27 +427,24 @@ function changeScene(scene) {
 function drawArena(time, turn) {
   const preview = round.profile.preview;
   const cues = [];
+  const nextMarkers = new Set();
+  const travel = turn?.response - turn?.prepare || (turn?.beat ?? round.turns[0].beat) * 2;
   for (const obstacle of obstacles) {
     if (obstacle.scene !== currentScene || obstacle.side !== visibleSide) continue;
     if (turn && obstacle.demo && time >= turn.prepare) continue;
     if (turn && !obstacle.demo && time < turn.prepare) continue;
     if (obstacle.note?.result && obstacle.note.result !== 'MISS') continue;
     const progress = approachProgress(obstacle, time, preview);
-    if (progress === null) continue;
-    cues.push({
-      obstacle,
-      progress,
-    });
-  }
-  // Draw the closest cue last so the next input remains readable.
-  cues.sort((a, b) => a.progress - b.progress);
-  const nextMarkers = new Set();
-  for (const { obstacle, progress } of cues) {
+    if (progress !== null) cues.push({ obstacle, progress });
+    const rail = railProgress(obstacle.at, time, travel);
+    if (rail === null) continue;
     const marker = obstacle.marker;
     marker.hidden = false;
-    marker.style.left = (96 - progress * 84) + '%';
+    marker.style.left = (96 - rail * 84) + '%';
     nextMarkers.add(marker);
   }
+  // Draw the closest scene cue last so the next input remains readable.
+  cues.sort((a, b) => a.progress - b.progress);
   for (const marker of visibleTimingNotes) {
     if (!nextMarkers.has(marker)) marker.hidden = true;
   }
@@ -452,6 +465,17 @@ function tick() {
     while (nextSound < demos.length && demos[nextSound].at <= playback.scheduleThrough) {
       const demo = demos[nextSound++];
       sound(demo.actionLane, playback.cueTime(demo.at), playback.demoGain);
+    }
+    while (nextBeatSound < responses.length && responses[nextBeatSound].at <= playback.scheduleThrough) {
+      const beat = responses[nextBeatSound++];
+      if (beatGuide) guideClick(playback.cueTime(beat.at));
+    }
+    while (nextBeatPulse < responses.length && responses[nextBeatPulse].at <= time) {
+      const beat = responses[nextBeatPulse++];
+      if (time - beat.at < .12) {
+        get('timing-target').animate([{ scale: '1.16', opacity: 1 }, { scale: '1', opacity: .8 }],
+          { duration: 180, easing: 'ease-out' });
+      }
     }
     const index = round.turns.findIndex(turn => time >= turn.start && time < turn.end);
     const turn = round.turns[index];
@@ -610,6 +634,7 @@ async function setPause(next) {
   if (next) {
     playback.pause();
     nextSound = nextMove;
+    nextBeatSound = nextBeatPulse;
   } else playback.resume();
   paused = next;
   confirmingQuit = false;
@@ -692,6 +717,7 @@ get('auto-setting').onchange = event => setAutoPlay(event.target.checked);
 get('button-settings').onclick = () => {
   get('auto-setting').checked = autoPlay;
   get('button-mode').value = buttonMode;
+  get('beat-guide').checked = beatGuide;
   get('timing-offset').value = inputOffset;
   get('offset-value').textContent = inputOffset + ' ms';
   bindingDraft = bindings;
@@ -710,6 +736,8 @@ get('binding-grid').onclick = event => {
 };
 get('timing-offset').oninput = event => { get('offset-value').textContent = event.target.value + ' ms'; };
 get('save-bindings').onclick = () => {
+  beatGuide = get('beat-guide').checked;
+  localStorage.setItem('festival-beat-guide', beatGuide ? 'on' : 'off');
   buttonMode = get('button-mode').value;
   localStorage.setItem(modeStorage, buttonMode);
   inputOffset = Number(get('timing-offset').value);

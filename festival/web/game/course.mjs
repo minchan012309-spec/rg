@@ -34,3 +34,8 @@ export function approachProgress(obstacle, time, preview) {
   const position = obstaclePosition(obstacle, time, preview);
   return position === null ? null : 1 - position / preview;
 }
+
+export function railProgress(at, time, travel) {
+  const elapsed = time - at;
+  return elapsed < -travel || elapsed > travel * .16 ? null : 1 + elapsed / travel;
+}

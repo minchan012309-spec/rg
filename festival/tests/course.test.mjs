@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { moves, course, obstaclePosition, approachProgress } from '../web/game/course.mjs';
+import { moves, course, obstaclePosition, approachProgress, railProgress } from '../web/game/course.mjs';
 import { createRound } from '../web/game/rhythm.mjs';
 
 test('the same obstacle reaches the line in demonstration and response four beats apart', () => {
@@ -49,4 +49,14 @@ test('first response cue uses both preparation beats even on hard', () => {
   assert.equal(approachProgress(first, 5, round.profile.preview), 0);
   assert.equal(approachProgress(first, 5.5, round.profile.preview), .5);
   assert.equal(approachProgress(first, 6, round.profile.preview), 1);
+});
+
+test('the timing bar keeps the gap between equal beats constant', () => {
+  assert.equal(railProgress(3, 2, 1), 0);
+  assert.equal(railProgress(3, 2.5, 1), .5);
+  assert.equal(railProgress(3, 3, 1), 1);
+  assert.equal(railProgress(3.5, 2.5, 1), 0);
+  assert.equal(railProgress(3.5, 3, 1), .5);
+  assert.equal(railProgress(3.5, 3.5, 1), 1);
+  assert.equal(railProgress(3, 1.95, 1), null);
 });
