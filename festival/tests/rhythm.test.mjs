@@ -38,8 +38,29 @@ test('each supplied song has an even number of turns with equal scoring opportun
   assert.equal(songs.length, 3);
   for (const song of songs) {
     const round = createRound(song);
-    assert.equal(song.turns.length, 8);
-    assert.equal(round.maxScores[0], round.maxScores[1]);
-    assert.ok(round.end <= song.duration);
+    assert.ok(song.turns.length > 8 && song.turns.length % 2 === 0);
+    assert.equal(round.rawMax[0], round.rawMax[1]);
+    assert.deepEqual(round.maxScores, [16000, 16000]);
+    assert.equal(round.end, song.duration);
+    assert.ok(round.turns.at(-1).end > song.duration - 4);
+    for (const turn of round.turns) {
+      assert.ok(turn.notes.every(note => note.time >= turn.response && note.time < turn.end));
+    }
   }
+});
+
+test('scoring follows measured beat timestamps instead of an average beat period', () => {
+  const round = createRound({
+    duration: 6, scoreCap: 16000,
+    turns: [{
+      start: 1, beat: .5, beats: [1, 1.5, 2, 2.5, 3.2, 3.7, 4.25, 4.75, 5.25],
+      hits: [[0, 0], [1.5, 2]],
+    }],
+  });
+  assert.equal(press(round, 0, 0, 3), null);
+  assert.equal(press(round, 0, 4, 3.2), null);
+  assert.equal(press(round, 0, 0, 3.2), 'PERFECT');
+  assert.equal(press(round, 0, 2, 3.975), 'PERFECT');
+  assert.equal(round.scores[0], 16000);
+  assert.equal(round.end, 6);
 });

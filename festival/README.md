@@ -8,8 +8,8 @@
 - Windows x64에서는 `dist/RhythmDuel.exe`를 엽니다. Windows에 설치된 Edge 또는 Chrome의 앱 창을 띄웁니다. 게임과 음원은 EXE에 들어 있습니다.
 - ESP32 두 대를 게임 PC에 연결합니다. P1은 위 Q/W, 아래 E/R/T를 사용합니다. P2는 위 A/S, 아래 D/F/G를 사용합니다.
 - 메뉴에서 P1의 Q/W로 이동, E로 선택, R로 뒤로, T로 팀 점수판을 엽니다. 게임 중 Esc로 일시정지하거나 재개합니다.
-- 리듬을 듣는 4박과 따라 치는 4박이 한 턴입니다. P1과 P2가 번갈아 네 턴씩 플레이합니다. PERFECT는 1,000점, GOOD은 650점입니다. 팀 순위는 한 경기 두 사람의 합계로 정합니다.
-- MP3 앞부분의 박자를 자동 추정한 채보입니다. 트랙 전체 길이와 관계없이 8턴이 끝나면 결과가 나옵니다.
+- 캐릭터가 시범을 보여주면 장애물이 판정선에 닿을 때 표시된 버튼을 누르세요. P1과 P2가 번갈아 진행합니다. 키를 누르면 판정과 관계없이 동작과 효과음이 나옵니다. PERFECT는 만점, GOOD은 그 판정의 65%를 얻습니다. 플레이어별 최종 점수는 곡에 관계없이 16,000점 만점이며, 팀 순위는 두 점수의 합계로 정합니다.
+- 세 MP3를 처음부터 끝까지 재생합니다. 전체 음원에서 주박을 추적한 채보를 사용하고, 음악과 시범 효과음은 같은 Web Audio 클록에서 재생합니다.
 
 ## 축제 운영 연결
 
@@ -37,7 +37,7 @@
 
 - 브라우저용 HTML: `python3 festival/build-web.py`
 - Windows x64 EXE: `./festival/build-windows.sh` (Go 1.24 이상)
-- 채보 재생성: `python3 festival/make_charts.py "game bgm1.mp3" "game bgm2.mp3" "game bgm3.mp3"` (FFmpeg, NumPy)
-- 판정 검사: `node --test festival/tests/rhythm.test.mjs`
+- 채보 재생성: `python3 festival/make_charts.py "game bgm1.mp3" "game bgm2.mp3" "game bgm3.mp3"` (FFmpeg, NumPy, SciPy)
+- 판정 검사: `node --test festival/tests/*.test.mjs`
 
 Mona12와 Bithumb Gothic Original은 요청한 CDN 주소를 사용합니다. 주소에 접속할 수 없을 때는 운영체제 글꼴로 표시합니다.
