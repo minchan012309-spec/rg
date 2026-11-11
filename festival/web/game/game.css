@@ -147,3 +147,4 @@ input{width:100%;padding:10px;background:var(--ink);color:var(--paper);border:1p
 @keyframes burst-life{from{opacity:1}to{opacity:0}}
 @keyframes burst-wave{from{scale:.48}to{scale:1.45}}
 @keyframes burst-particle{from{transform:rotate(var(--angle)) translateX(8px)}to{transform:rotate(var(--angle)) translateX(30px)}}
+.countdown{position:absolute;left:50%;top:57%;translate:-50% -50%;z-index:3;pointer-events:none;color:#fff7ed;opacity:.66;font-size:clamp(120px,185px,210px);line-height:1;text-shadow:0 3px 30px #161223}

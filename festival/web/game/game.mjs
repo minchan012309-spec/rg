@@ -61,6 +61,7 @@ let autoPlay = localStorage.getItem('festival-autoplay') === 'on';
 let autoSince = 0, exhibition = false;
 let lastPhase = '', lastCueNote, lastTurnIndex = -1, judgementTimer, recentInput = -Infinity;
 let visibleTimingNotes = new Set();
+let countdownBeats = [], nextCountdownSound = 0, whooshBuffer;
 let obstacles = [], demos = [], responses = [], nextSound = 0, nextMove = 0, nextBeatSound = 0, nextRailBurst = 0;
 const padTimers = new Map();
 
@@ -115,7 +116,7 @@ function render() {
     screen.innerHTML = '<section class="game"><div class="hud">' + meters +
       '</div><div class="stage course-stage" id="stage"><div class="stage-top"><strong id="scene-name"></strong><div id="phase"></div><span id="clock"></span></div>' +
       '<div class="timing-rail" id="timing-rail" aria-label="버튼 타이밍"><span class="timing-target" id="timing-target"></span><div id="timing-notes"></div></div>' +
-      '<canvas class="arena" id="arena"></canvas><div id="handoff" class="handoff" hidden></div><div id="prep-callout" class="prep-callout" hidden></div><div class="stage-bottom"><span id="cue"></span><strong id="judgement"></strong>' +
+      '<canvas class="arena" id="arena"></canvas><div id="handoff" class="handoff" hidden></div><div id="prep-callout" class="prep-callout" hidden></div><strong id="countdown" class="countdown" aria-hidden="true" hidden></strong><div class="stage-bottom"><span id="cue"></span><strong id="judgement"></strong>' +
       '</div><section class="pause-overlay" id="pause-overlay" hidden aria-label="일시정지"></section></div><div class="control-deck"><div class="console" id="pads">' + pads + '</div><span id="last-input"></span></div></section>';
     arena = new Arena(get('arena'));
     const timingNotes = get('timing-notes');
@@ -131,6 +132,8 @@ function render() {
     visibleTimingNotes.clear();
     demos = obstacles.filter(obstacle => obstacle.demo);
     responses = obstacles.filter(obstacle => !obstacle.demo);
+    countdownBeats = round.turns.flatMap(turn => turn.prepTicks);
+    nextCountdownSound = 0;
     nextSound = nextMove = nextBeatSound = nextRailBurst = 0;
     currentScene = null;
     visibleSide = 0;
@@ -326,6 +329,30 @@ function guideClick(at) {
   click.stop(when + .045);
 }
 
+function countdownWhoosh(at) {
+  const context = playback.context;
+  const when = Math.max(at, context.currentTime);
+  if (!whooshBuffer) {
+    whooshBuffer = context.createBuffer(1, Math.ceil(context.sampleRate * .24), context.sampleRate);
+    const samples = whooshBuffer.getChannelData(0);
+    for (let i = 0; i < samples.length; i++) samples[i] = Math.random() * 2 - 1;
+  }
+  const sweep = context.createBiquadFilter();
+  sweep.type = 'bandpass';
+  sweep.Q.value = .65;
+  sweep.frequency.setValueAtTime(420, when);
+  sweep.frequency.exponentialRampToValueAtTime(2400, when + .12);
+  sweep.frequency.exponentialRampToValueAtTime(520, when + .23);
+  const volume = context.createGain();
+  volume.gain.setValueAtTime(.001, when);
+  volume.gain.linearRampToValueAtTime(.36, when + .055);
+  volume.gain.exponentialRampToValueAtTime(.001, when + .23);
+  const source = context.createBufferSource();
+  source.buffer = whooshBuffer;
+  source.connect(sweep).connect(volume).connect(playback.demoGain);
+  source.start(when);
+}
+
 async function start() {
   if (starting || page === 'play') throw new Error('이미 게임을 진행 중입니다.');
   starting = true;
@@ -488,6 +515,9 @@ function tick() {
       const beat = responses[nextBeatSound++];
       if (beatGuide) guideClick(playback.cueTime(beat.at));
     }
+    while (nextCountdownSound < countdownBeats.length && countdownBeats[nextCountdownSound] <= playback.scheduleThrough) {
+      countdownWhoosh(playback.cueTime(countdownBeats[nextCountdownSound++]));
+    }
     while (nextRailBurst < obstacles.length && obstacles[nextRailBurst].at <= time) {
       const beat = obstacles[nextRailBurst++];
       if (time - beat.at < .12) burstAtTarget(beat.lane);
@@ -496,6 +526,7 @@ function tick() {
     const turn = round.turns[index];
     const preparing = turn && time >= turn.prepare && time < turn.response;
     get('prep-callout').hidden = !preparing;
+    get('countdown').hidden = !preparing;
     if (turn) {
       changeScene(turn.scene);
       if (index !== lastTurnIndex) {
@@ -513,7 +544,16 @@ function tick() {
     } else if (preparing) {
       const count = 1 + turn.prepTicks.filter(beat => beat > time).length;
       const icon = buttonIcon(turn.notes[0].lane);
-      if (lastPhase !== index + 'prep' + count) get('prep-callout').innerHTML = '첫 버튼 ' + icon;
+      if (lastPhase !== index + 'prep' + count) {
+        get('prep-callout').innerHTML = '첫 버튼 ' + icon;
+        const countdown = get('countdown');
+        countdown.textContent = count;
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          countdown.getAnimations().forEach(animation => animation.cancel());
+          countdown.animate([{ scale: '1.28', opacity: .18 }, { scale: '1', opacity: .66 }],
+            { duration: 170, easing: 'ease-out' });
+        }
+      }
       phase(index + 'prep' + count, turn.player, playerName(turn.player) + ' · 준비 ' + count, '첫 버튼을 준비하세요');
     } else if (time < turn.response) {
       const demo = turn.demonstrations.findLastIndex(start => start <= time);
@@ -651,6 +691,8 @@ async function setPause(next) {
     nextSound = nextMove;
     const upcomingBeat = responses.findIndex(beat => beat.at > playback.time);
     nextBeatSound = upcomingBeat < 0 ? responses.length : upcomingBeat;
+    const upcomingCount = countdownBeats.findIndex(beat => beat > playback.time);
+    nextCountdownSound = upcomingCount < 0 ? countdownBeats.length : upcomingCount;
   } else playback.resume();
   paused = next;
   confirmingQuit = false;

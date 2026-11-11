@@ -55,7 +55,7 @@ def chart(source, number, name, nominal_period):
     times, flux, duration = onset_strength(source)
     grid, period = fit_grid(times, flux, duration, nominal_period)
     first = int(np.searchsorted(grid, .55))
-    prep_beats = 2
+    prep_beats = 3
     beats_per_turn = 12 + prep_beats
     available = len(grid) - first - 1
     pairs = available // (2 * beats_per_turn)
