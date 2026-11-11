@@ -12,18 +12,6 @@ game = pathlib.Path(__file__).parent / "web/game"
 # The dominant beat periods measured on the three supplied recordings. These
 # avoid confusing a three-beat cross rhythm with the main pulse in Remix 6.
 recordings = [("Remix 10", .375), ("Remix 6", .43243), ("Remix 4", .54054)]
-patterns = [
-    [[0, 0], [1, 2], [2, 3], [3, 1]],
-    [[0, 1], [1, 3], [2, 2], [3, 0]],
-    [[0, 2], [1.5, 4], [2, 4], [3, 1]],
-    [[0, 4], [1.5, 2], [2, 2], [3, 0]],
-    [[0, 0], [0.5, 1], [2, 3], [3, 4]],
-    [[0, 1], [0.5, 0], [2, 3], [3, 2]],
-    [[0, 2], [1, 0], [2.5, 1], [3, 3]],
-    [[0, 4], [1, 1], [2.5, 0], [3, 3]],
-]
-
-
 def onset_strength(source):
     audio = np.frombuffer(subprocess.check_output([
         "ffmpeg", "-v", "error", "-i", str(source), "-ar", "11025",
@@ -73,13 +61,12 @@ def chart(source, number, name, nominal_period):
     closing_turn = 6 if remaining >= 12 else 4 if remaining >= 8 else 0
     lengths = [8] * count + ([closing_turn] * 2 if closing_turn else [])
     beat_index = first
-    for i, length in enumerate(lengths):
+    for length in lengths:
         beats = grid[beat_index:beat_index + length + 1]
         beat_index += length
         turns.append(dict(
             start=round(float(beats[0]), 5), beat=round(float(np.diff(beats).mean()), 5),
             beats=[round(float(beat), 5) for beat in beats],
-            hits=[hit for hit in patterns[i % len(patterns)] if hit[0] < length // 2][:length // 2],
         ))
     target = game / "audio" / f"bgm{number}.mp3"
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -88,7 +75,7 @@ def chart(source, number, name, nominal_period):
     print(f"{name}: {60 / period:.2f} BPM, {len(turns)} turns, "
           f"{turns[0]['start']:.2f}s–{turns[-1]['beats'][-1]:.2f}s of {duration:.2f}s")
     return dict(id=f"bgm{number}", name=name, duration=round(duration, 4),
-                bpm=round(60 / period, 1), scoreCap=16000, audio=f"audio/{target.name}", turns=turns)
+                bpm=round(60 / period, 1), scoreCap=16000, sceneOffset=(number - 1) * 4, audio=f"audio/{target.name}", turns=turns)
 
 
 if __name__ == "__main__":

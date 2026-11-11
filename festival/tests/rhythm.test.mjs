@@ -15,13 +15,13 @@ test('the demonstration accepts no hits and only the active player can score', (
   assert.equal(press(round, 0, 0, 3), 'PERFECT');
   assert.equal(press(round, 0, 0, 3), null);
   assert.equal(press(round, 0, 0, 7), null);
-  assert.equal(press(round, 1, 0, 7.08), 'GOOD');
+  assert.equal(press(round, 1, 0, 7.14), 'GOOD');
   assert.deepEqual(round.scores, [1000, 650]);
 });
 
 test('an overdue hit becomes a miss once and both gauges have equal capacity', () => {
   const round = createRound(chart);
-  assert.equal(advance(round, 3.2), 1);
+  assert.equal(advance(round, 3.25), 1);
   assert.equal(advance(round, 3.3), 0);
   assert.deepEqual(round.maxScores, [4000, 4000]);
 });
@@ -57,10 +57,41 @@ test('scoring follows measured beat timestamps instead of an average beat period
       hits: [[0, 0], [1.5, 2]],
     }],
   });
-  assert.equal(press(round, 0, 0, 3), null);
+  assert.equal(press(round, 0, 0, 2.9), null);
   assert.equal(press(round, 0, 4, 3.2), null);
   assert.equal(press(round, 0, 0, 3.2), 'PERFECT');
   assert.equal(press(round, 0, 2, 3.975), 'PERFECT');
   assert.equal(round.scores[0], 16000);
   assert.equal(round.end, 6);
+});
+
+test('festival players can hit a note 200 ms late and still score GOOD', () => {
+  const round = createRound(chart);
+  assert.equal(advance(round, 3.2), 0);
+  assert.equal(press(round, 0, 0, 3.2), 'GOOD');
+  assert.equal(press(round, 0, 1, 3.59), 'PERFECT');
+});
+
+test('all levels use full beats, equal opportunities, and different density', () => {
+  const songs = JSON.parse(readFileSync(new URL('../web/game/songs.json', import.meta.url)));
+  for (const song of songs) {
+    const rounds = ['soft', 'medium', 'hard'].map(level => createRound(song, level));
+    const [soft, medium, hard] = rounds;
+    assert.ok(soft.rawMax[0] < medium.rawMax[0] && medium.rawMax[0] < hard.rawMax[0]);
+    assert.ok(soft.turns.every(turn => turn.hits.length === 2 && turn.hits[1][0] === 2));
+    for (const round of rounds) {
+      assert.equal(round.rawMax[0], round.rawMax[1]);
+      assert.ok(round.turns.every(turn => turn.hits.every(([step]) => Number.isInteger(step))));
+      assert.ok(round.turns.every((turn, index) => turn.scene === round.turns[index ^ 1].scene));
+    }
+  }
+  const first = createRound(songs[0]);
+  assert.equal(new Set(first.turns.map(turn => turn.scene.id)).size, 12);
+});
+
+test('hard rejects a late key that soft accepts', () => {
+  const hard = createRound(chart, 'hard');
+  const soft = createRound(chart, 'soft');
+  assert.equal(press(hard, 0, 0, 3.2), null);
+  assert.equal(press(soft, 0, 0, 3.2), 'GOOD');
 });

@@ -8,18 +8,18 @@ export const moves = [
 
 export function course(round) {
   return round.turns.flatMap(turn => [
-    ...turn.notes.map((note, index) => ({
+    ...turn.notes.map(note => ({
       at: note.demoTime, lane: note.lane, side: turn.player,
-      demo: true, beat: turn.beat, note: null, index,
+      demo: true, beat: turn.beat, note: null, scene: turn.scene,
     })),
-    ...turn.notes.map((note, index) => ({
+    ...turn.notes.map(note => ({
       at: note.time, lane: note.lane, side: turn.player,
-      demo: false, beat: turn.beat, note, index,
+      demo: false, beat: turn.beat, note, scene: turn.scene,
     })),
   ]);
 }
 
-export function obstaclePosition(obstacle, time) {
+export function obstaclePosition(obstacle, time, preview = 1.55) {
   const delta = (obstacle.at - time) / obstacle.beat;
-  return delta > 1.55 || delta < -.5 ? null : delta;
+  return delta > preview || delta < -.65 ? null : delta;
 }
