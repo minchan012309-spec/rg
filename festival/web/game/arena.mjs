@@ -75,12 +75,20 @@ export function arenaFrame(containerWidth, containerHeight) {
 function drawBackdrop(g, image, x, y) {
   g.drawImage(image, x, y);
   if (x) {
-    for (const edge of [x, x + W]) {
-      g.save();
-      g.translate(2 * edge, 0);
-      g.scale(-1, 1);
-      g.drawImage(image, x, y);
-      g.restore();
+    // Extend only the outer scenery strips so objects such as the sun do not repeat.
+    const strip = 60;
+    for (const side of [-1, 1]) {
+      const edge = side < 0 ? x : x + W;
+      const sourceX = side < 0 ? 0 : W - strip;
+      for (let offset = 0; offset <= x; offset += strip) {
+        const direction = offset % (strip * 2) === 0 ? -1 : 1;
+        const left = side < 0 ? edge - offset - strip : edge + offset;
+        g.save();
+        g.translate(direction < 0 ? left + strip : left, y);
+        g.scale(direction, 1);
+        g.drawImage(image, sourceX, 0, strip, H, 0, 0, strip, H);
+        g.restore();
+      }
     }
   }
   if (y) {
