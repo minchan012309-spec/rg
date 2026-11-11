@@ -100,8 +100,7 @@ func run() error {
 	}
 	command := exec.Command(chromium, "--app=http://127.0.0.1:47823/game/",
 		"--user-data-dir="+profile, "--no-first-run", "--no-default-browser-check",
-		"--autoplay-policy=no-user-gesture-required", "--start-maximized",
-		"--disable-background-mode")
+		"--start-maximized", "--disable-background-mode")
 	return command.Run()
 }
 
