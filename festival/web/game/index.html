@@ -12,10 +12,27 @@
 <body>
 <header>
   <button class="brand" id="home"><img src="./icon.png" alt=""><span data-title>RHYTHM DUEL</span></button>
-  <div class="head-controls"><span id="network">로컬 플레이</span><button id="pause-button" hidden>일시정지</button><button id="settings">운영 연결</button><button id="fullscreen" aria-label="전체 화면">⛶</button></div>
+  <div class="head-controls"><span id="auto-indicator" hidden>전시 자동 플레이</span><span id="network">로컬 플레이</span><button id="pause-button" hidden>일시정지</button><button id="button-settings">버튼 설정</button><button id="settings">운영 연결</button><button id="fullscreen" aria-label="전체 화면">⛶</button></div>
 </header>
 <main id="screen" aria-live="off"></main>
 <footer id="guide"></footer>
+<dialog id="button-dialog">
+  <h2>버튼 설정</h2>
+  <p>화면에서 색과 크기를 고른 뒤, 실제 버튼을 한 번 눌러 등록하세요.</p>
+  <div id="binding-grid"></div>
+  <label class="auto-setting"><input type="checkbox" id="auto-setting">전시용 자동 플레이</label>
+  <label class="offset-setting" for="timing-offset">
+    <span>입력 보정 <output id="offset-value">0 ms</output></span>
+    <input id="timing-offset" type="range" min="-200" max="200" value="0" step="5">
+    <small>박자에 맞춰 눌러도 늦게 잡히면 값을 올리세요. 빠르게 잡히면 내리세요.</small>
+  </label>
+  <p id="binding-status" role="status"></p>
+  <div class="actions">
+    <button id="save-bindings" class="primary">저장</button>
+    <button id="reset-bindings">기본값</button>
+    <button id="cancel-bindings">닫기</button>
+  </div>
+</dialog>
 <dialog id="connection">
   <form id="station-login">
     <h2>게임 PC 연결</h2>

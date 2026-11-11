@@ -11,7 +11,7 @@ export class Playback {
     const unlock = this.context.resume();
     try {
       await Promise.race([unlock, new Promise((_, reject) => setTimeout(() =>
-        reject(new Error('게임 PC에서 E를 눌러 음원을 시작하세요.')), 1500))]);
+        reject(new Error('게임 PC에서 선택 버튼을 눌러 음원을 시작하세요.')), 1500))]);
       this.buffer = await this.context.decodeAudioData(await bytes());
     } catch (error) {
       throw new Error('음원을 시작할 수 없습니다. ' + error.message);
@@ -39,10 +39,14 @@ export class Playback {
   }
 
   get time() {
+    return this.timeAt(performance.now());
+  }
+
+  timeAt(eventTime) {
     if (!this.source) return this.offset;
     const stamp = this.context.getOutputTimestamp();
     const audible = stamp.performanceTime > 0
-      ? Math.min(this.context.currentTime, stamp.contextTime + (performance.now() - stamp.performanceTime) / 1000)
+      ? Math.min(this.context.currentTime, stamp.contextTime + (eventTime - stamp.performanceTime) / 1000)
       : this.context.currentTime;
     return this.offset + audible - this.startAt;
   }

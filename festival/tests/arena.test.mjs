@@ -9,7 +9,7 @@ test('all twenty scenes use distinct arena paths and meet the target exactly on 
     const arena = arenas[scene.id];
     const positions = [.2, .6, 1].map(progress => signalPosition(scene.id, 0, progress));
     paths.add(JSON.stringify(positions));
-    assert.deepEqual(positions.at(-1).slice(0, 2), arena.targets[0]);
+    assert.deepEqual(positions.at(-1).slice(0, 2), arena.targets[1]);
     assert.notDeepEqual(positions[0], positions[2]);
     assert.ok(scene.props.every(([, name]) => /^[a-z-]+$/.test(name)));
   }

@@ -29,8 +29,8 @@ export function obstaclePosition(obstacle, time, preview = 1.55) {
 export function approachProgress(obstacle, time, preview) {
   if (obstacle.approachStart != null) {
     if (time < obstacle.approachStart || time > obstacle.at + obstacle.beat * .65) return null;
-    return Math.min(1, (time - obstacle.approachStart) / (obstacle.at - obstacle.approachStart));
+    return (time - obstacle.approachStart) / (obstacle.at - obstacle.approachStart);
   }
   const position = obstaclePosition(obstacle, time, preview);
-  return position === null ? null : Math.min(1, 1 - position / preview);
+  return position === null ? null : 1 - position / preview;
 }

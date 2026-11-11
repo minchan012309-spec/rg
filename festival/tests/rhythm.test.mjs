@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createRound, press, advance, keyMap } from '../web/game/rhythm.mjs';
+import { createRound, press, advance } from '../web/game/rhythm.mjs';
+import { bindingMap, defaultBindings } from '../web/game/controls.mjs';
+const keyMap = bindingMap(defaultBindings);
 
 const chart = { turns: [
   { start: 1, beat: 0.5, hits: [[0, 0], [1, 1], [2, 3], [3, 4]] },
@@ -94,4 +96,20 @@ test('hard rejects a late key that soft accepts', () => {
   const soft = createRound(chart, 'soft');
   assert.equal(press(hard, 0, 0, 3.2), null);
   assert.equal(press(soft, 0, 0, 3.2), 'GOOD');
+});
+
+test('every recording has a hell level and Remix 4 hard starts at full density', () => {
+  const songs = JSON.parse(readFileSync(new URL('../web/game/songs.json', import.meta.url)));
+  for (const song of songs) {
+    const hard = createRound(song, 'hard');
+    const hell = createRound(song, 'hell');
+    assert.equal(hell.profile.id, 'hell');
+    assert.ok(hell.profile.good < hard.profile.good);
+    assert.ok(hell.profile.preview < hard.profile.preview);
+    assert.ok(hell.turns.every(turn => turn.hits.length === 4 && new Set(turn.hits.map(hit => hit[1])).size === 3));
+    assert.equal(hell.rawMax[0], hell.rawMax[1]);
+  }
+  const remix4 = createRound(songs[2], 'hard');
+  assert.ok(remix4.turns.every(turn => turn.hits.length === 4));
+  assert.ok(remix4.profile.good < createRound(songs[0], 'hard').profile.good);
 });

@@ -1,4 +1,4 @@
-import { createRound, press, advance, keyMap, playerKeys } from './rhythm.mjs';
+import { createRound, press, advance } from './rhythm.mjs';
 import { FestivalCloud } from '../shared/cloud.mjs';
 import { title } from './title.mjs';
 import { moves, course, approachProgress } from './course.mjs';
@@ -6,7 +6,14 @@ import { Playback } from './playback.mjs';
 import { levels, sceneProp } from './remix.mjs';
 import { Arena } from './arena.mjs';
 import { MenuMusic } from './menu-music.mjs';
+import { physicalButtons, defaultBindings, bindingMap, readBindings, assignBinding, buttonIcon, describeCode } from './controls.mjs';
 
+const bindingStorage = 'festival-controller-bindings';
+let bindings = readBindings(localStorage.getItem(bindingStorage));
+let keyMap = bindingMap(bindings);
+let bindingDraft, captureTarget;
+const offsetStorage = 'festival-input-offset';
+let inputOffset = Math.max(-200, Math.min(200, Number(localStorage.getItem(offsetStorage)) || 0));
 const get = id => document.getElementById(id);
 const screen = get('screen');
 const guide = get('guide');
@@ -44,7 +51,10 @@ let currentScene, arena, visibleSide = 0;
 let page, focus = 0, selected = 0, choosing = 0, chosen = [0, 1];
 let round, matchId, paused = false, starting = false, currentNames = [], receipt, playback;
 let pauseFocus = 0, confirmingQuit = false;
-let lastPhase = '', judgementTimer, recentInput = -Infinity;
+let autoPlay = localStorage.getItem('festival-autoplay') === 'on';
+let autoSince = 0, exhibition = false;
+let lastPhase = '', lastCueNote, lastTurnIndex = -1, judgementTimer, recentInput = -Infinity;
+let visibleTimingNotes = new Set();
 let obstacles = [], demos = [], nextSound = 0, nextMove = 0;
 const padTimers = new Map();
 
@@ -65,6 +75,8 @@ function render() {
   get('pause-button').hidden = page !== 'play';
   get('pause-button').textContent = '일시정지';
   get('settings').hidden = page === 'play';
+  get('button-settings').hidden = page === 'play';
+  get('auto-indicator').hidden = !autoPlay;
   const song = songs[selected];
   if (page === 'home') {
     screen.innerHTML = '<section class="home"><div><span class="kicker">2인 리듬 대결</span><h1>' + escape(title) +
@@ -78,7 +90,7 @@ function render() {
         escape(item.name) + '</b><span>' + item.bpm + ' BPM · ' + clock(item.duration) + ' · ' + item.turns.length + '턴</span></button>').join('') + '</div>' + back);
   }
   if (page === 'levels') {
-    screen.innerHTML = pane('난이도 선택', '<p>' + escape(song.name) + ' · ' + clock(song.duration) + '</p><div class="tiles">' +
+    screen.innerHTML = pane('난이도 선택', '<p>' + escape(song.name) + ' · ' + clock(song.duration) + '</p><div class="tiles level-tiles">' +
       levels.map((item, index) => '<button class="tile level-tile" data-action="level" data-index="' + index + '"><b>' +
         item.name + '</b><span>' + item.description + '</span></button>').join('') + '</div>' + back);
   }
@@ -93,13 +105,24 @@ function render() {
       '</span><strong id="score' + side + '">0</strong><progress aria-label="플레이어 ' + (side + 1) +
       ' 점수" id="bar' + side + '" max="' + round.maxScores[side] + '" value="0"></progress></div>').join('');
     const pads = moves.map((_, lane) => '<span class="pad" id="pad' + lane +
-      '"><b></b><small></small></span>').join('');
+      '">' + buttonIcon(lane) + '<small></small></span>').join('');
     screen.innerHTML = '<section class="game"><div class="hud">' + meters +
       '</div><div class="stage course-stage" id="stage"><div class="stage-top"><strong id="scene-name"></strong><div id="phase"></div><span id="clock"></span></div>' +
-      '<canvas class="arena" id="arena"></canvas><div id="prep-callout" class="prep-callout" hidden></div><div class="stage-bottom"><span id="cue"></span><strong id="judgement"></strong>' +
+      '<div class="timing-rail" id="timing-rail" aria-label="버튼 타이밍"><span class="timing-target" id="timing-target"></span><div id="timing-notes"></div></div>' +
+      '<canvas class="arena" id="arena"></canvas><div id="handoff" class="handoff" hidden></div><div id="prep-callout" class="prep-callout" hidden></div><div class="stage-bottom"><span id="cue"></span><strong id="judgement"></strong>' +
       '</div><section class="pause-overlay" id="pause-overlay" hidden aria-label="일시정지"></section></div><div class="control-deck"><div class="console" id="pads">' + pads + '</div><span id="last-input"></span></div></section>';
     arena = new Arena(get('arena'));
-    obstacles = course(round);
+    const timingNotes = get('timing-notes');
+    obstacles = course(round).map(obstacle => {
+      const marker = document.createElement('span');
+      marker.className = 'timing-note';
+      marker.dataset.demo = obstacle.demo;
+      marker.innerHTML = buttonIcon(obstacle.lane);
+      marker.hidden = true;
+      timingNotes.append(marker);
+      return { ...obstacle, marker };
+    });
+    visibleTimingNotes.clear();
     demos = obstacles.filter(obstacle => obstacle.demo);
     nextSound = nextMove = 0;
     currentScene = null;
@@ -110,7 +133,7 @@ function render() {
   if (page === 'result') {
     const [one, two] = round.scores;
     const winner = one === two ? '무승부' : playerName(one > two ? 0 : 1) + ' 승리!';
-    screen.innerHTML = pane('결과 집계 중…', '<p>' + escape(song.name) + ' · ' + round.profile.name +
+    screen.innerHTML = pane('결과 집계 중…', '<p>' + escape(song.name) + ' · ' + round.profile.name + (exhibition ? ' · 전시 자동 플레이' : '') +
       '</p><div class="stats result-stats">' + round.scores.map((_, side) =>
         '<div>' + avatar(chosen[side]) + '<span>' + escape(playerName(side)) + '</span><strong id="final-score' +
         side + '">0</strong><div class="result-meter"><i id="final-bar' + side + '"></i></div></div>').join('') +
@@ -125,8 +148,10 @@ function render() {
         '</span><strong>' + (record.score1 + record.score2).toLocaleString() + '</strong></li>').join('') :
         '<li>아직 기록이 없습니다.</li>') + '</ol>' + back);
   }
-  guide.textContent = page === 'play' ? 'P1 Q W / E R T　·　P2 A S / D F G　·　Esc 일시정지' :
-    'PLAYER 1　Q / W 이동　·　E 선택　·　R 뒤로　·　T 점수판';
+  guide.innerHTML = page === 'play'
+    ? '버튼 아이콘이 판정 원에 겹칠 때 같은 버튼을 누르세요.'
+    : '<span>플레이어 1</span><span>' + buttonIcon(0) + buttonIcon(1) + ' 이동</span><span>' +
+      buttonIcon(2) + ' 선택</span><span>' + buttonIcon(3) + ' 뒤로</span><span>' + buttonIcon(4) + ' 점수판</span>';
   highlight();
 }
 
@@ -192,7 +217,14 @@ screen.addEventListener('click', event => {
   if (pauseButton && paused) pauseAction(pauseButton.dataset.pauseAction);
 });
 document.addEventListener('keydown', event => {
-  if (get('connection').open || event.repeat || event.ctrlKey || event.altKey || event.metaKey) return;
+  if (event.repeat || event.ctrlKey || event.altKey || event.metaKey) return;
+  if (get('button-dialog').open) {
+    captureBinding(event);
+    return;
+  }
+  if (get('connection').open) return;
+  const mapped = keyMap[event.code];
+  const menuLane = mapped?.[0] === 0 ? mapped[1] : -1;
   if (page === 'play') {
     if (event.code === 'Escape') {
       event.preventDefault();
@@ -201,46 +233,55 @@ document.addEventListener('keydown', event => {
       return;
     }
     if (paused) {
-      if (event.code === 'KeyQ' || event.code === 'KeyW') {
-        pauseFocus = 1 - pauseFocus;
+      if (menuLane === 0 || menuLane === 1) {
+        const count = get('pause-overlay').querySelectorAll('button').length;
+        pauseFocus = (pauseFocus + (menuLane === 0 ? count - 1 : 1)) % count;
         renderPause();
-      } else if (event.code === 'KeyE') {
+      } else if (menuLane === 2) {
         get('pause-overlay').querySelectorAll('button')[pauseFocus]?.click();
-      } else if (event.code === 'KeyR' && confirmingQuit) {
+      } else if (menuLane === 3 && confirmingQuit) {
         pauseAction('cancel');
       } else return;
       event.preventDefault();
       return;
     }
-    const mapped = keyMap[event.code];
     if (!mapped) return;
     event.preventDefault();
     const [side, lane] = mapped;
-    const time = playback.time;
-    recentInput = performance.now();
-    flash(side, lane, true);
-    sound(lane);
-    const result = press(round, side, lane, time);
-    arena.strike(side, lane, !!result, recentInput);
-    const responding = round.turns.some(turn =>
-      turn.player === side && time >= turn.response && time < turn.end);
-    feedback(result || (responding ? 'MISS' : '입력'), playerKeys[side][lane]);
-    if (result) updateScores();
+    const now = performance.now();
+    const eventTime = event.timeStamp >= 0 && event.timeStamp <= now ? event.timeStamp : now;
+    hitButton(side, lane, playback.timeAt(eventTime) - inputOffset / 1000);
     return;
   }
   if (page === 'result' && get('result-actions')?.hidden) return;
   const buttons = [...screen.querySelectorAll('[data-action]')];
-  switch (event.code) {
-    case 'KeyQ': focus = (focus + buttons.length - 1) % buttons.length; break;
-    case 'KeyW': focus = (focus + 1) % buttons.length; break;
-    case 'KeyE': buttons[focus]?.click(); break;
-    case 'KeyR': if (page !== 'home') action('back'); break;
-    case 'KeyT': if (page === 'board') show('home'); else void showBoard(); break;
+  switch (menuLane) {
+    case 0: focus = (focus + buttons.length - 1) % buttons.length; break;
+    case 1: focus = (focus + 1) % buttons.length; break;
+    case 2: buttons[focus]?.click(); break;
+    case 3: if (page !== 'home') action('back'); break;
+    case 4: if (page === 'board') show('home'); else void showBoard(); break;
     default: return;
   }
   event.preventDefault();
   highlight();
 });
+
+function hitButton(side, lane, time, automated = false) {
+  recentInput = performance.now();
+  flash(side, lane, true);
+  sound(lane);
+  const result = press(round, side, lane, time);
+  arena.strike(side, lane, !!result, recentInput);
+  const responding = round.turns.some(turn =>
+    turn.player === side && time >= turn.response && time < turn.end);
+  feedback(result || (responding ? 'MISS' : '입력'), lane);
+  if (!result) return;
+  if (automated) exhibition = true;
+  updateScores();
+  get('timing-target').animate([{ opacity: 1, scale: '1.22' }, { opacity: .8, scale: '1' }],
+    { duration: 230, easing: 'ease-out' });
+}
 
 function sound(lane, at, destination) {
   const context = playback.context;
@@ -275,7 +316,11 @@ async function start() {
     matchId = crypto.randomUUID();
     round = createRound(songs[selected], levels[level].id);
     paused = false;
+    autoSince = 0;
+    exhibition = false;
     lastPhase = '';
+    lastCueNote = undefined;
+    lastTurnIndex = -1;
     recentInput = -Infinity;
     clearTimeout(judgementTimer);
     show('play');
@@ -293,9 +338,9 @@ function updateScores() {
   });
 }
 
-function feedback(text, key = '') {
+function feedback(text, lane = null) {
   const judgement = get('judgement');
-  judgement.textContent = key ? key + ' · ' + text : text;
+  judgement.innerHTML = lane == null ? text : buttonIcon(lane) + '<span>' + text + '</span>';
   judgement.dataset.result = text;
   clearTimeout(judgementTimer);
   judgementTimer = setTimeout(() => { judgement.textContent = ''; }, 480);
@@ -311,7 +356,7 @@ function flash(side, lane, input = false) {
   if (!input) return;
   const indicator = get('last-input');
   const label = sceneProp(currentScene, lane)?.[2] ?? moves[lane].name;
-  indicator.textContent = 'P' + (side + 1) + ' · ' + playerKeys[side][lane] + ' · ' + label;
+  indicator.innerHTML = '<span>P' + (side + 1) + '</span>' + buttonIcon(lane) + '<span>' + label + '</span>';
   clearTimeout(padTimers.get(indicator));
   padTimers.set(indicator, setTimeout(() => { indicator.textContent = ''; }, 700));
 }
@@ -324,7 +369,6 @@ function updatePads() {
     const prop = sceneProp(currentScene, lane);
     pad.classList.toggle('unused', !prop);
     pad.classList.remove('lit');
-    pad.querySelector('b').textContent = playerKeys[visibleSide][lane];
     pad.querySelector('small').textContent = prop?.[2] ?? '';
   }
 }
@@ -369,11 +413,21 @@ function drawArena(time, turn) {
     cues.push({
       obstacle,
       progress,
-      key: playerKeys[obstacle.side][obstacle.lane],
     });
   }
   // Draw the closest cue last so the next input remains readable.
   cues.sort((a, b) => a.progress - b.progress);
+  const nextMarkers = new Set();
+  for (const { obstacle, progress } of cues) {
+    const marker = obstacle.marker;
+    marker.hidden = false;
+    marker.style.left = (96 - progress * 84) + '%';
+    nextMarkers.add(marker);
+  }
+  for (const marker of visibleTimingNotes) {
+    if (!nextMarkers.has(marker)) marker.hidden = true;
+  }
+  visibleTimingNotes = nextMarkers;
   arena.draw(time, visibleSide, chosen[visibleSide], cues, performance.now());
 }
 
@@ -383,7 +437,6 @@ function tick() {
   if (paused) phase('pause', null, '게임 일시정지', 'Esc 또는 관리자 화면에서 재개');
   else {
     get('clock').textContent = clock(Math.max(0, time)) + ' / ' + clock(songs[selected].duration);
-    if (advance(round, time) && performance.now() - recentInput > 450) feedback('MISS');
     if (time >= playback.buffer.duration) {
       finish();
       return;
@@ -396,28 +449,45 @@ function tick() {
     const turn = round.turns[index];
     const preparing = turn && time >= turn.prepare && time < turn.response;
     get('prep-callout').hidden = !preparing;
-    if (turn) changeScene(turn.scene);
+    if (turn) {
+      changeScene(turn.scene);
+      if (index !== lastTurnIndex) {
+        const handoff = get('handoff');
+        handoff.textContent = playerName(turn.player) + ' 차례';
+        handoff.hidden = false;
+        lastTurnIndex = index;
+        lastCueNote = undefined;
+      }
+      if (time - turn.start > .65) get('handoff').hidden = true;
+    } else get('handoff').hidden = true;
     if (!turn) {
       const closing = time >= round.turns.at(-1).end;
       phase(closing ? 'end' : 'wait', null, closing ? '곡 마무리' : '준비!', songs[selected].name);
     } else if (preparing) {
       const count = 1 + turn.prepTicks.filter(beat => beat > time).length;
-      const key = playerKeys[turn.player][turn.notes[0].lane];
-      phase(index + 'prep' + count, turn.player, playerName(turn.player) + ' · 준비 ' + count, '첫 키  ' + key);
-      get('prep-callout').textContent = '첫 키  ' + key;
+      const icon = buttonIcon(turn.notes[0].lane);
+      if (lastPhase !== index + 'prep' + count) get('prep-callout').innerHTML = '첫 버튼 ' + icon;
+      phase(index + 'prep' + count, turn.player, playerName(turn.player) + ' · 준비 ' + count, '첫 버튼을 준비하세요');
     } else if (time < turn.response) {
       const demo = turn.demonstrations.findLastIndex(start => start <= time);
       const label = demo < 0 ? '준비' : '시범 ' + (demo + 1) + ' / ' + turn.demonstrations.length;
       phase(index + 'call' + demo, turn.player, playerName(turn.player) + ' · ' + label, turn.scene.cue);
     } else {
       phase(index + 'response', turn.player, playerName(turn.player) + ' · 내 차례',
-        '물건이 판정선에 닿을 때 버튼을 누르세요');
+        '타이밍 바의 원에 버튼 아이콘이 겹치면 누르세요');
       const upcoming = turn.notes.find(note => !note.result);
-      if (upcoming) {
-        const prop = sceneProp(turn.scene, upcoming.lane);
-        get('cue').textContent = '다음 ' + playerKeys[turn.player][upcoming.lane] + ' · ' + prop[2];
-      } else get('cue').textContent = '이번 차례 끝!';
+      if ((upcoming ?? null) !== lastCueNote) {
+        const prop = upcoming && sceneProp(turn.scene, upcoming.lane);
+        get('cue').innerHTML = prop ? '다음 ' + buttonIcon(upcoming.lane) + '<span>' + prop[2] + '</span>' : '이번 차례 끝!';
+        lastCueNote = upcoming ?? null;
+      }
     }
+    if (autoPlay && turn && time >= turn.response) {
+      for (const note of turn.notes) {
+        if (!note.result && note.time >= autoSince && note.time <= time) hitButton(turn.player, note.lane, note.time, true);
+      }
+    }
+    if (advance(round, time - Math.max(0, inputOffset) / 1000 - .025) && performance.now() - recentInput > 450) feedback('MISS');
     while (nextMove < demos.length && demos[nextMove].at <= time) {
       const demo = demos[nextMove++];
       arena.strike(demo.side, demo.lane, true, performance.now());
@@ -468,11 +538,13 @@ function revealResult(winner) {
 
 function finish() {
   playback.pause();
-  records.push({
-    id: matchId, song: songs[selected].id, team: rosterAtStart, score1: round.scores[0],
-    score2: round.scores[1], synced: false, project: projectAtStart,
-  });
-  savedScores();
+  if (!exhibition) {
+    records.push({
+      id: matchId, song: songs[selected].id, team: rosterAtStart, score1: round.scores[0],
+      score2: round.scores[1], synced: false, project: projectAtStart,
+    });
+    savedScores();
+  }
   show('result');
 }
 
@@ -483,16 +555,30 @@ function renderPause() {
   if (!paused) return;
   const choices = confirmingQuit
     ? [['cancel', '취소'], ['quit', '경기 포기']]
-    : [['resume', '계속하기'], ['confirm', '경기 포기']];
+    : [['resume', '계속하기'], ['confirm', '경기 포기'], ['auto', '자동 플레이 ' + (autoPlay ? '켜짐' : '꺼짐')]];
   overlay.innerHTML = '<div class="pause-panel"><h2>' +
     (confirmingQuit ? '경기를 포기할까요?' : '일시정지') + '</h2><p>' +
-    (confirmingQuit ? '이번 경기는 점수판에 저장되지 않습니다.' : 'Q / W 이동 · E 선택') + '</p><div class="actions">' +
+    (confirmingQuit ? '이번 경기는 점수판에 저장되지 않습니다.' : buttonIcon(0) + buttonIcon(1) + ' 이동 · ' + buttonIcon(2) + ' 선택') + '</p><div class="actions">' +
     choices.map(([choice, label], index) => '<button class="' + (index === pauseFocus ? 'selected ' : '') +
-      (index === 1 ? 'quit' : 'primary') + '" data-pause-action="' + choice + '">' + label + '</button>').join('') +
+      (index === 1 ? 'quit' : index === 0 ? 'primary' : '') + '" data-pause-action="' + choice + '"' +
+      (choice === 'auto' ? ' role="switch" aria-checked="' + autoPlay + '"' : '') + '>' + label + '</button>').join('') +
     '</div></div>';
 }
 
+function setAutoPlay(next) {
+  autoPlay = next;
+  if (next && page === 'play') autoSince = playback.time;
+  localStorage.setItem('festival-autoplay', next ? 'on' : 'off');
+  get('auto-setting').checked = next;
+  get('auto-indicator').hidden = !next;
+}
+
 function pauseAction(action) {
+  if (action === 'auto') {
+    setAutoPlay(!autoPlay);
+    renderPause();
+    return;
+  }
   if (action === 'resume') {
     void setPause(false).catch(error => audioError(error.message));
     return;
@@ -566,6 +652,71 @@ async function heartbeat() {
   }
   setTimeout(heartbeat, 850);
 }
+
+const controllerDialog = get('button-dialog');
+
+function renderBindings() {
+  get('binding-grid').innerHTML = bindingDraft.map((row, side) =>
+    '<section class="binding-player"><h3>플레이어 ' + (side + 1) + '</h3><div class="binding-pads">' +
+    row.map((code, lane) => {
+      const capturing = captureTarget?.side === side && captureTarget.lane === lane;
+      return '<button class="bind-button' + (capturing ? ' selected' : '') + '" data-side="' + side +
+        '" data-lane="' + lane + '" aria-pressed="' + !!capturing + '">' + buttonIcon(lane) +
+        '<span>' + physicalButtons[lane].name + '</span><small>' + describeCode(code) + '</small></button>';
+    }).join('') + '</div></section>').join('');
+}
+
+function captureBinding(event) {
+  if (!captureTarget || event.code === 'Escape') return;
+  event.preventDefault();
+  const { side, lane } = captureTarget;
+  try {
+    bindingDraft = assignBinding(bindingDraft, side, lane, event.code);
+    get('binding-status').textContent = '플레이어 ' + (side + 1) + ' · ' + physicalButtons[lane].name + ' 등록됨';
+    captureTarget = null;
+    renderBindings();
+  } catch (error) {
+    get('binding-status').textContent = error.message;
+  }
+}
+
+get('auto-setting').onchange = event => setAutoPlay(event.target.checked);
+get('button-settings').onclick = () => {
+  get('auto-setting').checked = autoPlay;
+  get('timing-offset').value = inputOffset;
+  get('offset-value').textContent = inputOffset + ' ms';
+  bindingDraft = bindings;
+  captureTarget = null;
+  get('binding-status').textContent = '';
+  renderBindings();
+  controllerDialog.showModal();
+};
+get('binding-grid').onclick = event => {
+  const button = event.target.closest('[data-lane]');
+  if (!button) return;
+  captureTarget = { side: Number(button.dataset.side), lane: Number(button.dataset.lane) };
+  get('binding-status').textContent = '플레이어 ' + (captureTarget.side + 1) + ' · ' +
+    physicalButtons[captureTarget.lane].name + ' 버튼을 누르세요.';
+  renderBindings();
+};
+get('timing-offset').oninput = event => { get('offset-value').textContent = event.target.value + ' ms'; };
+get('save-bindings').onclick = () => {
+  inputOffset = Number(get('timing-offset').value);
+  localStorage.setItem(offsetStorage, String(inputOffset));
+  bindings = bindingDraft;
+  keyMap = bindingMap(bindings);
+  localStorage.setItem(bindingStorage, JSON.stringify(bindings));
+  controllerDialog.close();
+};
+get('reset-bindings').onclick = () => {
+  bindingDraft = defaultBindings;
+  get('timing-offset').value = 0;
+  get('offset-value').textContent = '0 ms';
+  captureTarget = null;
+  get('binding-status').textContent = '기본 배치로 바꿨습니다. 저장을 누르면 적용됩니다.';
+  renderBindings();
+};
+get('cancel-bindings').onclick = () => controllerDialog.close();
 
 get('pause-button').onclick = () => {
   if (page === 'play') void setPause(!paused).catch(error => audioError(error.message));

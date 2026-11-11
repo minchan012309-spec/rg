@@ -1,18 +1,14 @@
 import { levels, remixTurn } from './remix.mjs';
 
-export const playerKeys = ['QWERT', 'ASDFG'];
-export const keyMap = Object.fromEntries(
-  playerKeys.flatMap((keys, player) =>
-    [...keys].map((key, lane) => ['Key' + key, [player, lane]]))
-);
-
 function beatTime(beats, step) {
   const i = Math.floor(step);
   return beats[i] + (beats[i + 1] - beats[i]) * (step - i);
 }
 
 export function createRound(song, level = 'soft') {
-  const profile = levels.find(item => item.id === level) ?? levels[0];
+  const standard = levels.find(item => item.id === level) ?? levels[0];
+  const denseHard = song.id === 'bgm3' && standard.id === 'hard';
+  const profile = denseHard ? { ...standard, good: .082, perfect: .038, preview: 1.55 } : standard;
   const rawMax = [0, 0];
   const turns = song.turns.map((turn, index) => {
     const player = index % 2;
@@ -24,7 +20,7 @@ export function createRound(song, level = 'soft') {
     const prepareBeat = lead + phraseBeats * repeats;
     const responseBeat = prepareBeat + prepBeats;
     const demonstrations = Array.from({ length: repeats }, (_, i) => beats[lead + phraseBeats * i]);
-    const arranged = remixTurn(index, phraseBeats, profile.id, song.sceneOffset);
+    const arranged = remixTurn(index, phraseBeats, profile.id, song.sceneOffset, denseHard);
     const hits = turn.hits ?? arranged.hits;
     rawMax[player] += hits.length * 1000;
     return {

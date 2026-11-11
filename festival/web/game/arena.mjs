@@ -33,7 +33,7 @@ export const arenas = {
 
 export function signalPosition(scene, slot, progress) {
   const { targets, path } = arenas[scene];
-  const [x, y] = targets[slot];
+  const [x, y] = targets[1];
   if (progress === 1) return [x, y, 1];
   const p = progress;
   const rest = 1 - p;
@@ -419,37 +419,12 @@ function actor(g, x, y, character, lane, energy, scene) {
   g.restore();
 }
 
-function drawTarget(g, x, y, path, color, time) {
-  const glow = .5 + .5 * Math.sin(time * 7);
-  g.globalAlpha = .67 + .20 * glow;
-  if (path === 'side') {
-    line(g, x, 94, x, 161, color, 1);
-    polygon(g, [[x - 5, 155], [x + 5, 155], [x, 161]], color);
-  } else if (path === 'frame') {
-    const size = 13;
-    for (const [dx, dy] of [[-1,-1],[1,-1],[-1,1],[1,1]]) {
-      line(g, x + dx * size, y + dy * size, x + dx * 8, y + dy * size, color);
-      line(g, x + dx * size, y + dy * size, x + dx * size, y + dy * 8, color);
-    }
-  } else ring(g, x, y, 13, color, 1);
-  g.globalAlpha = 1;
-}
-
-function drawSignal(g, sprite, key, x, y, scale, color, demo, ringCue) {
+function drawSignal(g, sprite, x, y, scale, color, ringCue) {
   g.save();
   g.translate(Math.round(x), Math.round(y));
   if (ringCue) ring(g, 0, 0, 14 * scale, color, 2);
-  g.save();
   g.scale(ringCue ? 1 : scale, ringCue ? 1 : scale);
   sprites[sprite](g);
-  g.restore();
-  const labelY = -21 - (ringCue ? 10 : 0);
-  rect(g, -8, labelY - 7, 16, 14, demo ? ink : color);
-  g.fillStyle = demo ? paper : ink;
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  g.font = 'bold 11px monospace';
-  g.fillText(key, 0, labelY + 1);
   g.restore();
 }
 
@@ -481,21 +456,18 @@ export class Arena {
 
   draw(time, side, character, cues, now) {
     const g = this.g;
-    const { path, actor: [x, y], targets } = this.layout;
+    const { path, actor: [x, y] } = this.layout;
     g.drawImage(this.background, 0, 0);
     const current = this.action?.side === side ? this.action : null;
     const age = current ? (now - current.now) / 365 : 1;
     const energy = age < 1 ? Math.sin(Math.max(0, age) * Math.PI) : 0;
-    targets.forEach(([tx, ty], slot) => {
-      if (path !== 'side' || slot === 1) drawTarget(g, tx, ty, path, this.scene.color, time);
-    });
     actor(g, x, y, character, current?.lane, energy, this.scene.id);
-    for (const { obstacle, progress, key } of cues) {
+    for (const { obstacle, progress } of cues) {
       const prop = sceneProp(this.scene, obstacle.lane);
       if (!prop) continue;
       const slot = this.scene.props.indexOf(prop);
-      const [sx, sy, scale] = signalPosition(this.scene.id, slot, progress);
-      drawSignal(g, prop[1], key, sx, sy, scale, this.scene.color, obstacle.demo, path === 'ring');
+      const [sx, sy, scale] = signalPosition(this.scene.id, slot, Math.min(progress, 1));
+      drawSignal(g, prop[1], sx, sy, scale, this.scene.color, path === 'ring');
     }
     if (current?.scored && age < 1) this.effect(current.lane, age);
   }
@@ -504,7 +476,7 @@ export class Arena {
     const g = this.g;
     const prop = sceneProp(this.scene, lane);
     if (!prop) return;
-    const [x, y] = this.layout.targets[this.scene.props.indexOf(prop)];
+    const [x, y] = this.layout.targets[1];
     const { path } = this.layout;
     g.globalAlpha = 1 - age;
     if (path === 'frame') {
