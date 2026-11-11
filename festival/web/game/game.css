@@ -91,3 +91,7 @@ input{width:100%;padding:10px;background:var(--ink);color:var(--paper);border:1p
 .winner-reveal{color:var(--lime);animation:reveal .48s cubic-bezier(.2,.8,.3,1)}
 @keyframes reveal{from{opacity:.12;transform:translateY(16px) scale(.96)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.winner-reveal{animation:none}}
+.pause-overlay{position:absolute;inset:0;display:grid;place-items:center;z-index:5;background:#100d20db}
+.pause-panel{width:min(610px,92%);padding:36px;background:#231d37;border:2px solid var(--line);box-shadow:10px 10px #100d20}
+.pause-panel h2{font-size:49px;letter-spacing:-.07em}.pause-panel p{color:var(--muted);margin-top:12px}
+.pause-panel .quit{border-color:var(--pink);color:var(--pink)}

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { scenes } from '../web/game/remix.mjs';
 import { arenas, signalPosition } from '../web/game/arena.mjs';
 
-test('all twelve scenes use distinct arena paths and meet the target exactly on the beat', () => {
+test('all twenty scenes use distinct arena paths and meet the target exactly on the beat', () => {
   const paths = new Set();
   for (const scene of scenes) {
     const arena = arenas[scene.id];
@@ -13,7 +13,7 @@ test('all twelve scenes use distinct arena paths and meet the target exactly on 
     assert.notDeepEqual(positions[0], positions[2]);
     assert.ok(scene.props.every(([, name]) => /^[a-z-]+$/.test(name)));
   }
-  assert.equal(paths.size, 12);
+  assert.equal(paths.size, 20);
 });
 
 test('the drum cue contracts in place while the grill drops ingredients downwards', () => {

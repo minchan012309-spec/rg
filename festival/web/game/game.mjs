@@ -38,6 +38,7 @@ if (level < 0) level = 0;
 let currentScene, arena, visibleSide = 0;
 let page, focus = 0, selected = 0, choosing = 0, chosen = [0, 1];
 let round, matchId, paused = false, starting = false, currentNames = [], receipt, playback;
+let pauseFocus = 0, confirmingQuit = false;
 let lastPhase = '', judgementTimer, recentInput = -Infinity;
 let obstacles = [], demos = [], nextSound = 0, nextMove = 0;
 const padTimers = new Map();
@@ -55,6 +56,9 @@ function show(next, index = 0) {
 }
 
 function render() {
+  get('pause-button').hidden = page !== 'play';
+  get('pause-button').textContent = '일시정지';
+  get('settings').hidden = page === 'play';
   const song = songs[selected];
   if (page === 'home') {
     screen.innerHTML = '<section class="home"><div><span class="kicker">2인 리듬 대결</span><h1>' + escape(title) +
@@ -87,7 +91,7 @@ function render() {
     screen.innerHTML = '<section class="game"><div class="hud">' + meters +
       '</div><div class="stage course-stage" id="stage"><div class="stage-top"><strong id="scene-name"></strong><div id="phase"></div><span id="clock"></span></div>' +
       '<canvas class="arena" id="arena"></canvas><div class="stage-bottom"><span id="cue"></span><strong id="judgement"></strong>' +
-      '</div></div><div class="control-deck"><div class="console" id="pads">' + pads + '</div><span id="last-input"></span></div></section>';
+      '</div><section class="pause-overlay" id="pause-overlay" hidden aria-label="일시정지"></section></div><div class="control-deck"><div class="console" id="pads">' + pads + '</div><span id="last-input"></span></div></section>';
     arena = new Arena(get('arena'));
     obstacles = course(round);
     demos = obstacles.filter(obstacle => obstacle.demo);
@@ -178,16 +182,32 @@ function action(type, index) {
 screen.addEventListener('click', event => {
   const button = event.target.closest('[data-action]');
   if (button) action(button.dataset.action, Number(button.dataset.index));
+  const pauseButton = event.target.closest('[data-pause-action]');
+  if (pauseButton && paused) pauseAction(pauseButton.dataset.pauseAction);
 });
 document.addEventListener('keydown', event => {
   if (get('connection').open || event.repeat || event.ctrlKey || event.altKey || event.metaKey) return;
   if (page === 'play') {
     if (event.code === 'Escape') {
       event.preventDefault();
-      void setPause(!paused).catch(error => audioError(error.message));
+      if (paused && confirmingQuit) pauseAction('cancel');
+      else void setPause(!paused).catch(error => audioError(error.message));
+      return;
+    }
+    if (paused) {
+      if (event.code === 'KeyQ' || event.code === 'KeyW') {
+        pauseFocus = 1 - pauseFocus;
+        renderPause();
+      } else if (event.code === 'KeyE') {
+        get('pause-overlay').querySelectorAll('button')[pauseFocus]?.click();
+      } else if (event.code === 'KeyR' && confirmingQuit) {
+        pauseAction('cancel');
+      } else return;
+      event.preventDefault();
+      return;
     }
     const mapped = keyMap[event.code];
-    if (!mapped || paused) return;
+    if (!mapped) return;
     event.preventDefault();
     const [side, lane] = mapped;
     const time = playback.time;
@@ -333,7 +353,7 @@ function drawArena(time, turn) {
   const cues = [];
   for (const obstacle of obstacles) {
     if (obstacle.scene !== currentScene || obstacle.side !== visibleSide) continue;
-    if (obstacle.demo && turn && time >= turn.response) continue;
+    if (turn && (obstacle.demo ? time >= turn.response : time < turn.response - turn.beat)) continue;
     if (obstacle.note?.result && obstacle.note.result !== 'MISS') continue;
     const position = obstaclePosition(obstacle, time, preview);
     if (position === null) continue;
@@ -370,8 +390,9 @@ function tick() {
       const closing = time >= round.turns.at(-1).end;
       phase(closing ? 'end' : 'wait', null, closing ? '곡 마무리' : '준비!', songs[selected].name);
     } else if (time < turn.response) {
-      phase(index + 'call', turn.player, playerName(turn.player) + ' · 시범',
-        turn.scene.cue);
+      const demo = turn.demonstrations.findLastIndex(start => start <= time);
+      const label = demo < 0 ? '준비' : '시범 ' + (demo + 1) + ' / ' + turn.demonstrations.length;
+      phase(index + 'call' + demo, turn.player, playerName(turn.player) + ' · ' + label, turn.scene.cue);
     } else {
       phase(index + 'response', turn.player, playerName(turn.player) + ' · 내 차례',
         '물건이 판정선에 닿을 때 버튼을 누르세요');
@@ -439,6 +460,40 @@ function finish() {
   show('result');
 }
 
+function renderPause() {
+  const overlay = get('pause-overlay');
+  overlay.hidden = !paused;
+  get('pause-button').textContent = paused ? '재개' : '일시정지';
+  if (!paused) return;
+  const choices = confirmingQuit
+    ? [['cancel', '취소'], ['quit', '경기 포기']]
+    : [['resume', '계속하기'], ['confirm', '경기 포기']];
+  overlay.innerHTML = '<div class="pause-panel"><h2>' +
+    (confirmingQuit ? '경기를 포기할까요?' : '일시정지') + '</h2><p>' +
+    (confirmingQuit ? '이번 경기는 점수판에 저장되지 않습니다.' : 'Q / W 이동 · E 선택') + '</p><div class="actions">' +
+    choices.map(([choice, label], index) => '<button class="' + (index === pauseFocus ? 'selected ' : '') +
+      (index === 1 ? 'quit' : 'primary') + '" data-pause-action="' + choice + '">' + label + '</button>').join('') +
+    '</div></div>';
+}
+
+function pauseAction(action) {
+  if (action === 'resume') {
+    void setPause(false).catch(error => audioError(error.message));
+    return;
+  }
+  if (action === 'quit') {
+    playback.pause();
+    paused = false;
+    confirmingQuit = false;
+    matchId = null;
+    show('home');
+    return;
+  }
+  confirmingQuit = action === 'confirm';
+  pauseFocus = 0;
+  renderPause();
+}
+
 async function setPause(next) {
   if (page !== 'play') throw new Error('진행 중인 게임이 없습니다.');
   if (paused === next) return;
@@ -447,6 +502,9 @@ async function setPause(next) {
     nextSound = nextMove;
   } else playback.resume();
   paused = next;
+  confirmingQuit = false;
+  pauseFocus = 0;
+  renderPause();
 }
 
 function state() {
@@ -493,6 +551,9 @@ async function heartbeat() {
   setTimeout(heartbeat, 850);
 }
 
+get('pause-button').onclick = () => {
+  if (page === 'play') void setPause(!paused).catch(error => audioError(error.message));
+};
 get('home').onclick = () => { if (page !== 'play' && !starting) show('home'); };
 get('fullscreen').onclick = () => {
   const transition = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();

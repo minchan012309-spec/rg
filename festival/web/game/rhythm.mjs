@@ -17,14 +17,20 @@ export function createRound(song, level = 'soft') {
   const turns = song.turns.map((turn, index) => {
     const player = index % 2;
     const beats = turn.beats ?? Array.from({ length: 9 }, (_, i) => turn.start + i * turn.beat);
-    const half = (beats.length - 1) / 2;
-    const arranged = remixTurn(index, half, profile.id, song.sceneOffset);
+    const repeats = song.demoRepeats ?? 1;
+    const lead = turn.demoLead ?? 0;
+    const phraseBeats = (beats.length - 1 - lead) / (repeats + 1);
+    const responseBeat = lead + phraseBeats * repeats;
+    const demonstrations = Array.from({ length: repeats }, (_, i) => beats[lead + phraseBeats * i]);
+    const arranged = remixTurn(index, phraseBeats, profile.id, song.sceneOffset);
     const hits = turn.hits ?? arranged.hits;
     rawMax[player] += hits.length * 1000;
     return {
-      ...turn, player, scene: arranged.scene, hits, response: beats[half], end: beats.at(-1),
+      ...turn, player, scene: arranged.scene, hits, demonstrations, response: beats[responseBeat], end: beats.at(-1),
       notes: hits.map(([step, lane]) => ({
-        lane, time: beatTime(beats, half + step), demoTime: beatTime(beats, step), result: null,
+        lane, time: beatTime(beats, responseBeat + step),
+        demoTimes: demonstrations.map((_, i) => beatTime(beats, lead + phraseBeats * i + step)),
+        result: null,
       })),
     };
   });

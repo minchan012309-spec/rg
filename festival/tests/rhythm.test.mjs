@@ -85,8 +85,8 @@ test('all levels use full beats, equal opportunities, and different density', ()
       assert.ok(round.turns.every((turn, index) => turn.scene === round.turns[index ^ 1].scene));
     }
   }
-  const first = createRound(songs[0]);
-  assert.equal(new Set(first.turns.map(turn => turn.scene.id)).size, 12);
+  const used = songs.flatMap(song => createRound(song).turns.map(turn => turn.scene.id));
+  assert.equal(new Set(used).size, 20);
 });
 
 test('hard rejects a late key that soft accepts', () => {

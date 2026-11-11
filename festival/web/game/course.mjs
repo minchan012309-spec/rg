@@ -8,10 +8,10 @@ export const moves = [
 
 export function course(round) {
   return round.turns.flatMap(turn => [
-    ...turn.notes.map(note => ({
-      at: note.demoTime, lane: note.lane, side: turn.player,
+    ...turn.demonstrations.flatMap((_, index) => turn.notes.map(note => ({
+      at: note.demoTimes[index], lane: note.lane, side: turn.player,
       demo: true, beat: turn.beat, note: null, scene: turn.scene,
-    })),
+    }))),
     ...turn.notes.map(note => ({
       at: note.time, lane: note.lane, side: turn.player,
       demo: false, beat: turn.beat, note, scene: turn.scene,

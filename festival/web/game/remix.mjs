@@ -18,6 +18,14 @@ export const scenes = [
   { id: 'fireworks', name: '불꽃놀이', cue: '들어오는 신호에 맞춰 불꽃을 쏴!', color: '#ff9eb8', props: [[0,'spark','작은 불꽃'],[1,'rocket','큰 불꽃'],[4,'burst','회전 불꽃']] },
   { id: 'train', name: '기차', cue: '신호가 오면 선로를 바꾸거나 기적을 울려!', color: '#facb8a', props: [[2,'switch','선로 전환'],[3,'stop','브레이크'],[1,'whistle','기적 울리기']] },
   { id: 'robot', name: '로봇 조립', cue: '부품이 작업대에 오면 끼우고 조여!', color: '#a6e9eb', props: [[0,'battery','배터리 끼우기'],[3,'bolt','볼트 조이기'],[4,'gear','기어 돌리기']] },
+  { id: 'fishing', name: '낚시', cue: '찌가 물결에 닿으면 낚싯대를 당겨!', color: '#9ee2dd', props: [[1,'bobber','찌 당기기'],[4,'fish','물고기 낚기'],[2,'shell','조개 건지기']] },
+  { id: 'ski', name: '스키', cue: '내려오는 깃발과 경사에 맞춰 움직여!', color: '#91cfff', props: [[0,'flag','왼쪽 돌기'],[1,'snowbank','눈더미 뛰기'],[2,'beam','몸 낮추기']] },
+  { id: 'magic', name: '마술', cue: '무대의 세 모자에 마술을 걸어!', color: '#eb9ee1', props: [[0,'hat','토끼 꺼내기'],[3,'charm','카드 뒤집기'],[4,'vortex','모자 돌리기']] },
+  { id: 'clockwork', name: '시계탑', cue: '바늘이 표시된 톱니에 닿으면 작동시켜!', color: '#ffd68b', props: [[0,'gear','작은 톱니'],[1,'bell','종 울리기'],[3,'bolt','바늘 맞추기']] },
+  { id: 'basketball', name: '농구', cue: '포물선을 그리는 공이 골대에 오면 받아!', color: '#ffb47d', props: [[0,'basketball','받아 던지기'],[1,'basketball','높게 슛'],[3,'grounder','바운드 잡기']] },
+  { id: 'surf', name: '서핑', cue: '파도 꼭대기와 물골에 맞춰 보드를 움직여!', color: '#80f0df', props: [[0,'wave','파도 넘기'],[2,'beam','물골 통과'],[4,'bubble','보드 돌리기']] },
+  { id: 'post', name: '우편 분류', cue: '편지와 소포를 맞는 상자로 보내!', color: '#f3cb96', props: [[2,'letter','편지 밀기'],[3,'charm','도장 찍기'],[4,'crate','소포 돌리기']] },
+  { id: 'lanterns', name: '등불 축제', cue: '등불이 줄에 닿는 순간 하나씩 밝혀!', color: '#ffba92', props: [[0,'lantern','작은 등불'],[1,'lantern','큰 등불'],[4,'spark','별등 켜기']] },
 ];
 
 export function sceneProp(scene, lane) {

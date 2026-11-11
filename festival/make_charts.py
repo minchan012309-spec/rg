@@ -55,19 +55,23 @@ def chart(source, number, name, nominal_period):
     times, flux, duration = onset_strength(source)
     grid, period = fit_grid(times, flux, duration, nominal_period)
     first = int(np.searchsorted(grid, .55))
-    count = ((len(grid) - first - 1) // 16) * 2
+    beats_per_turn = 12
+    available = len(grid) - first - 1
+    pairs = available // (2 * beats_per_turn)
+    spare_pairs = available // 2 - pairs * beats_per_turn
     turns = []
-    remaining = len(grid) - first - count * 8 - 1
-    closing_turn = 6 if remaining >= 12 else 4 if remaining >= 8 else 0
-    lengths = [8] * count + ([closing_turn] * 2 if closing_turn else [])
     beat_index = first
-    for length in lengths:
-        beats = grid[beat_index:beat_index + length + 1]
-        beat_index += length
-        turns.append(dict(
-            start=round(float(beats[0]), 5), beat=round(float(np.diff(beats).mean()), 5),
-            beats=[round(float(beat), 5) for beat in beats],
-        ))
+    for pair in range(pairs):
+        # Put spare beats before the demonstrations, keeping both players equal.
+        lead = (spare_pairs * (pair + 1) // pairs) - (spare_pairs * pair // pairs)
+        for _ in range(2):
+            length = beats_per_turn + lead
+            beats = grid[beat_index:beat_index + length + 1]
+            beat_index += length
+            turns.append(dict(
+                start=round(float(beats[0]), 5), beat=round(float(np.diff(beats).mean()), 5),
+                beats=[round(float(beat), 5) for beat in beats], demoLead=lead,
+            ))
     target = game / "audio" / f"bgm{number}.mp3"
     target.parent.mkdir(parents=True, exist_ok=True)
     if source.resolve() != target.resolve():
@@ -75,7 +79,7 @@ def chart(source, number, name, nominal_period):
     print(f"{name}: {60 / period:.2f} BPM, {len(turns)} turns, "
           f"{turns[0]['start']:.2f}s–{turns[-1]['beats'][-1]:.2f}s of {duration:.2f}s")
     return dict(id=f"bgm{number}", name=name, duration=round(duration, 4),
-                bpm=round(60 / period, 1), scoreCap=16000, sceneOffset=(number - 1) * 4, audio=f"audio/{target.name}", turns=turns)
+                bpm=round(60 / period, 1), scoreCap=16000, demoRepeats=2, sceneOffset=[0, 8, 15][number - 1], audio=f"audio/{target.name}", turns=turns)
 
 
 if __name__ == "__main__":

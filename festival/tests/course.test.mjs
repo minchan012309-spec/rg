@@ -18,3 +18,16 @@ test('the same obstacle reaches the line in demonstration and response four beat
 test('all five physical positions have a distinct obstacle action', () => {
   assert.deepEqual(moves.map(move => move.id), ['hop', 'leap', 'slide', 'stomp', 'spin']);
 });
+
+test('two full demonstrations play in order before the response can score', () => {
+  const round = createRound({
+    demoRepeats: 2,
+    turns: [{ start: 1, beat: .5, beats: Array.from({ length: 13 }, (_, i) => 1 + i * .5),
+      hits: [[0, 0], [2, 1]] }],
+  });
+  const turn = round.turns[0];
+  assert.deepEqual(turn.demonstrations, [1, 3]);
+  assert.equal(turn.response, 5);
+  assert.deepEqual(course(round).map(({ at, lane }) => [at, lane]),
+    [[1, 0], [2, 1], [3, 0], [4, 1], [5, 0], [6, 1]]);
+});

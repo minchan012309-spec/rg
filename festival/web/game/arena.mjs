@@ -21,6 +21,14 @@ export const arenas = {
   fireworks: { actor: [104, 166], targets: [[151, 61], [243, 43], [340, 66]], path: 'fuse', palette: ['#21183d', '#4d325a', '#ffd088'] },
   train: { actor: [272, 165], targets: columns(143, 144, 237, 330), path: 'rail', palette: ['#d59068', '#7c4f62', '#ffdf9a'] },
   robot: { actor: [101, 143], targets: columns(109, 193, 265, 337), path: 'assembly', palette: ['#283f53', '#486b73', '#a8e7db'] },
+  fishing: { actor: [105, 114], targets: [[220, 103], [290, 128], [367, 149]], path: 'lure', palette: ['#7cb7b1', '#285b69', '#bfdcb9'] },
+  ski: { actor: [258, 139], targets: [[213, 127], [248, 137], [292, 149]], path: 'slope', palette: ['#a9d4e7', '#e0edf1', '#577d9d'] },
+  magic: { actor: [250, 108], targets: [[158, 130], [240, 142], [327, 132]], path: 'trick', palette: ['#261d4a', '#723b72', '#ecc2dd'] },
+  clockwork: { actor: [109, 161], targets: [[207, 69], [244, 48], [282, 73]], path: 'sweep', palette: ['#795568', '#dfb878', '#ffdfab'] },
+  basketball: { actor: [119, 158], targets: [[367, 79], [386, 71], [333, 122]], path: 'lob', palette: ['#605b88', '#d59065', '#ffdfb0'] },
+  surf: { actor: [179, 130], targets: [[183, 116], [195, 142], [215, 119]], path: 'wave', palette: ['#f5a78e', '#2d7893', '#a8f1d7'] },
+  post: { actor: [404, 155], targets: [[199, 139], [273, 139], [343, 140]], path: 'chute', palette: ['#8f6267', '#aa775f', '#f8d29e'] },
+  lanterns: { actor: [123, 169], targets: [[205, 73], [279, 56], [351, 70]], path: 'wind', palette: ['#292542', '#4c3e64', '#ffd39e'] },
 };
 
 export function signalPosition(scene, slot, progress) {
@@ -42,6 +50,18 @@ export function signalPosition(scene, slot, progress) {
     case 'fuse': return [x, mix(185, y, p), .6 + .4 * p];
     case 'rail': return [mix(238, x, p * p), mix(60, y, p * p), .26 + .74 * p];
     case 'assembly': return [x + 112 * rest, y - Math.min(60, 123 * rest), 1];
+    case 'lure': return [mix(123, x, p), y + 19 * rest - 55 * Math.sin(p * Math.PI), 1];
+    case 'slope': return [mix(65 + slot * 56, x, p * p), mix(22, y, p), .43 + .57 * p];
+    case 'trick': return [x + 84 * rest * Math.cos(p * 7 + slot), y - 90 * rest, .8 + .2 * p];
+    case 'sweep': {
+      const angle = Math.atan2(y - 94, x - 244) - rest * 2.2;
+      const radius = Math.hypot(y - 94, x - 244);
+      return [244 + radius * Math.cos(angle), 94 + radius * Math.sin(angle), 1];
+    }
+    case 'lob': return [mix(125, x, p), mix(143, y, p) - 71 * Math.sin(p * Math.PI), .83 + .17 * p];
+    case 'wave': return [x + 253 * rest, y + 22 * Math.sin(rest * Math.PI * 3.4), 1];
+    case 'chute': return [x - 168 * rest, y - 123 * Math.pow(rest, 2), 1];
+    case 'wind': return [x - 112 * rest + 19 * Math.sin(p * Math.PI * 3), y + 104 * rest, .76 + .24 * p];
   }
 }
 
@@ -217,6 +237,88 @@ const backdrops = {
     for (let x = 144; x < W; x += 30) disc(g, x, 137, 7, '#273b52');
     rect(g, 58, 150, 91, 27, '#557f82');
   },
+  fishing(g, [, water, land]) {
+    disc(g, 383, 43, 22, '#fcecb8');
+    mountains(g, '#668d80', 98, 83);
+    rect(g, 0, 92, W, 100, water);
+    for (let y = 104; y < 187; y += 13) {
+      for (let x = (y * 7) % 43; x < W; x += 56) rect(g, x, y, 22, 2, '#61a8ad');
+    }
+    rect(g, 0, 111, 149, 12, land);
+    for (const x of [23, 67, 124]) rect(g, x, 117, 6, 37, '#7c6668');
+    line(g, 113, 105, 151, 62, '#f5d39b', 2);
+  },
+  ski(g, [, snow, ridge]) {
+    mountains(g, '#91b8d2', 119, 68);
+    polygon(g, [[0, 11], [99, 25], [480, 168], [480, 192], [0, 192]], snow);
+    line(g, 45, 25, 476, 177, '#accde0', 5);
+    for (let x = 22; x < W; x += 73) {
+      const y = 66 + x * .27;
+      polygon(g, [[x, y - 28], [x + 11, y], [x - 11, y]], ridge);
+    }
+  },
+  magic(g, [, curtain, light]) {
+    for (let x = 0; x < W; x += 40) rect(g, x, 0, 22, 126, curtain);
+    polygon(g, [[209, 0], [279, 0], [365, 171], [119, 171]], '#d594b640');
+    rect(g, 0, 153, W, 39, '#562f61');
+    for (const x of [158, 240, 327]) {
+      rect(g, x - 23, 139, 46, 27, '#aa626e');
+      rect(g, x - 28, 136, 56, 4, light);
+    }
+    dots(g, '#efb3c3', 98, 17);
+  },
+  clockwork(g, [, metal, light]) {
+    rect(g, 149, 12, 194, 164, '#514357');
+    disc(g, 244, 94, 70, metal); disc(g, 244, 94, 61, '#5f4a60');
+    for (let i = 0; i < 12; i++) {
+      const a = i * Math.PI / 6;
+      rect(g, 242 + 51 * Math.cos(a), 92 + 51 * Math.sin(a), 4, 4, light);
+    }
+    line(g, 244, 94, 227, 52, light, 3);
+    line(g, 244, 94, 285, 104, metal, 3);
+    rect(g, 0, 165, W, 27, '#624a59');
+  },
+  basketball(g, [, floor, trim]) {
+    rect(g, 0, 135, W, 57, floor);
+    for (let x = 0; x < W; x += 26) line(g, x, 137, x + 10, 192, '#ac6a5d', 1);
+    ring(g, 207, 165, 26, trim, 2);
+    rect(g, 400, 62, 7, 99, '#8d86a5');
+    rect(g, 364, 49, 48, 33, '#b8afc0');
+    rect(g, 373, 54, 22, 14, '#e5d2cb');
+    line(g, 349, 80, 387, 80, '#f78f6c', 4);
+    for (let x = 351; x < 387; x += 8) line(g, x, 82, 367, 100, trim, 1);
+  },
+  surf(g, [, water, foam]) {
+    disc(g, 386, 37, 23, '#ffe7ad');
+    rect(g, 0, 85, W, 107, water);
+    for (let i = 0; i < 3; i++) {
+      for (let x = 0; x < W; x += 4) {
+        const y = 100 + i * 26 + Math.sin(x / 32 + i) * (15 - i * 3);
+        rect(g, x, y, 4, 3, i === 0 ? foam : '#5daec1');
+      }
+    }
+    rect(g, 146, 132, 60, 5, '#ffd892');
+  },
+  post(g, [, cabinet, trim]) {
+    for (let y = 22; y < 103; y += 29) for (let x = 26; x < W; x += 60) {
+      rect(g, x, y, 48, 21, cabinet);
+      rect(g, x + 13, y + 6, 22, 4, '#674b5e');
+    }
+    rect(g, 0, 160, W, 32, '#694f61');
+    for (const x of [199, 273, 343]) {
+      rect(g, x - 25, 132, 50, 37, cabinet);
+      rect(g, x - 23, 130, 46, 5, trim);
+      rect(g, x - 9, 145, 18, 4, '#674b5e');
+    }
+  },
+  lanterns(g, [, ridge, light]) {
+    dots(g, '#a7a1cc', 153);
+    mountains(g, ridge, 161, 84);
+    disc(g, 405, 40, 19, '#f6d4b4');
+    line(g, 179, 67, 372, 46, '#9f827e', 2);
+    rect(g, 0, 165, W, 27, '#533f58');
+    for (let x = 35; x < W; x += 48) rect(g, x, 168, 8, 3, light);
+  },
 };
 
 const sprites = {
@@ -280,6 +382,15 @@ const sprites = {
   battery(g) { rect(g, -7, -9, 14, 20, '#8dd9b0'); rect(g, -3, -12, 6, 3, paper); rect(g, -4, -5, 8, 3, '#427f82'); },
   bolt(g) { rect(g, -3, -4, 6, 15, '#96b8cb'); polygon(g, [[-8, -8], [-5, -11], [5, -11], [8, -8], [4, -4], [-4, -4]], '#e2e5db'); },
   gear(g) { disc(g, 0, 0, 9, '#b9dae1'); for (let i = 0; i < 6; i++) rect(g, Math.cos(i * Math.PI / 3) * 9 - 2, Math.sin(i * Math.PI / 3) * 9 - 2, 4, 4, '#b9dae1'); disc(g, 0, 0, 4, '#486b73'); },
+  bobber(g) { disc(g, 0, 0, 8, paper); rect(g, -8, 0, 16, 4, '#e9787b'); rect(g, -1, -12, 2, 6, '#f3b078'); },
+  fish(g) { disc(g, 0, 0, 8, '#83d8c5'); polygon(g, [[-6,0],[-15,-7],[-15,7]], '#5daab0'); rect(g, 3, -3, 2, 3, ink); },
+  flag(g) { line(g, -5, -11, -5, 11, paper, 2); polygon(g, [[-4,-11],[12,-7],[-4,-2]], '#ed8388'); },
+  snowbank(g) { polygon(g, [[-13,7],[-4,-5],[3,-9],[14,7]], '#e5f7ff'); line(g, -9, 5, 10, 5, '#9dc5db', 2); },
+  hat(g) { rect(g, -9, -10, 18, 15, '#744c8b'); rect(g, -14, 5, 28, 5, '#473352'); rect(g, -9, 1, 18, 4, '#f0a0bb'); },
+  basketball(g) { disc(g, 0, 0, 9, '#f79754'); ring(g, 0, 0, 9, '#a75b58', 1); line(g, -9, 0, 9, 0, '#a75b58', 1); line(g, 0, -9, 0, 9, '#a75b58', 1); },
+  wave(g) { polygon(g, [[-13,8],[-8,0],[0,-10],[11,-6],[4,-3],[8,2],[15,8]], '#7fe6da'); line(g, -4, -3, 8, -6, paper, 2); },
+  letter(g) { rect(g, -12, -8, 24, 16, '#f3dfb2'); line(g, -11, -7, 0, 2, '#b47d72', 1); line(g, 0, 2, 11, -7, '#b47d72', 1); },
+  lantern(g) { disc(g, 0, 0, 10, '#f6a275'); rect(g, -6, -10, 12, 3, '#a46a67'); rect(g, -5, 8, 10, 3, '#a46a67'); rect(g, -2, -5, 4, 10, '#ffd09b'); },
 };
 
 const avatars = ['#bafa66', '#ff77ba', '#a99bff', '#ffbc66'];
