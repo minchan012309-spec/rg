@@ -65,6 +65,35 @@ export function signalPosition(scene, slot, progress) {
   }
 }
 
+export function arenaFrame(containerWidth, containerHeight) {
+  const ratio = containerWidth > 0 && containerHeight > 0 ? containerWidth / containerHeight : W / H;
+  const width = Math.max(W, Math.round(H * ratio));
+  const height = Math.max(H, Math.round(W / ratio));
+  return { width, height, x: Math.floor((width - W) / 2), y: Math.floor((height - H) / 2) };
+}
+
+function drawBackdrop(g, image, x, y) {
+  g.drawImage(image, x, y);
+  if (x) {
+    for (const edge of [x, x + W]) {
+      g.save();
+      g.translate(2 * edge, 0);
+      g.scale(-1, 1);
+      g.drawImage(image, x, y);
+      g.restore();
+    }
+  }
+  if (y) {
+    for (const edge of [y, y + H]) {
+      g.save();
+      g.translate(0, 2 * edge);
+      g.scale(1, -1);
+      g.drawImage(image, x, y);
+      g.restore();
+    }
+  }
+}
+
 function rect(g, x, y, w, h, color) {
   g.fillStyle = color;
   g.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
@@ -457,7 +486,14 @@ export class Arena {
   draw(time, side, character, cues, now) {
     const g = this.g;
     const { path, actor: [x, y] } = this.layout;
-    g.drawImage(this.background, 0, 0);
+    const frame = arenaFrame(this.canvas.clientWidth, this.canvas.clientHeight);
+    if (this.canvas.width !== frame.width || this.canvas.height !== frame.height) {
+      this.canvas.width = frame.width;
+      this.canvas.height = frame.height;
+    }
+    drawBackdrop(g, this.background, frame.x, frame.y);
+    g.save();
+    g.translate(frame.x, frame.y);
     const current = this.action?.side === side ? this.action : null;
     const age = current ? (now - current.now) / 365 : 1;
     const energy = age < 1 ? Math.sin(Math.max(0, age) * Math.PI) : 0;
@@ -470,6 +506,7 @@ export class Arena {
       drawSignal(g, prop[1], sx, sy, scale, this.scene.color, path === 'ring');
     }
     if (current?.scored && age < 1) this.effect(current.lane, age);
+    g.restore();
   }
 
   effect(lane, age) {
