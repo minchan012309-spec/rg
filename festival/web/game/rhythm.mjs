@@ -13,14 +13,14 @@ export function createRound(song, level = 'soft', buttonMode = 'five') {
   const turns = song.turns.map((turn, index) => {
     const player = index % 2;
     const beats = turn.beats ?? Array.from({ length: 9 }, (_, i) => turn.start + i * turn.beat);
-    const repeats = song.demoRepeats ?? 1;
+    const repeats = turn.demoRepeats ?? song.demoRepeats ?? 1;
     const lead = turn.demoLead ?? 0;
     const prepBeats = song.prepBeats ?? 0;
     const phraseBeats = (beats.length - 1 - lead - prepBeats) / (repeats + 1);
     const prepareBeat = lead + phraseBeats * repeats;
     const responseBeat = prepareBeat + prepBeats;
     const demonstrations = Array.from({ length: repeats }, (_, i) => beats[lead + phraseBeats * i]);
-    const arranged = remixTurn(index, phraseBeats, profile.id, song.sceneOffset, denseHard);
+    const arranged = remixTurn(song.sharedDemo ? index - player : index, phraseBeats, profile.id, song.sceneOffset, denseHard);
     const hits = turn.hits ?? arranged.hits;
     rawMax[player] += hits.length * 1000;
     return {

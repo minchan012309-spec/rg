@@ -123,3 +123,18 @@ test('big-only play keeps the scene actions but judges only the two dome buttons
   assert.equal(round.lastHit.actionLane, 3);
   assert.deepEqual(round.rawMax, [4000, 4000]);
 });
+
+test('each minigame teaches a shared pattern before player one and skips player two’s demonstration', () => {
+  const songs = JSON.parse(readFileSync(new URL('../web/game/songs.json', import.meta.url)));
+  for (const song of songs) for (const level of ['soft','medium','hard','hell']) {
+    const { turns } = createRound(song, level);
+    for (let i = 0; i < turns.length; i += 2) {
+      const [one, two] = turns.slice(i, i + 2);
+      assert.equal(one.demonstrations.length, 2);
+      assert.equal(two.demonstrations.length, 0);
+      assert.deepEqual(one.hits, two.hits);
+      assert.equal(two.prepTicks.length, 3);
+      assert.equal(one.end, two.start);
+    }
+  }
+});

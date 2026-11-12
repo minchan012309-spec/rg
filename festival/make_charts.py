@@ -56,22 +56,22 @@ def chart(source, number, name, nominal_period):
     grid, period = fit_grid(times, flux, duration, nominal_period)
     first = int(np.searchsorted(grid, .55))
     prep_beats = 3
-    beats_per_turn = 12 + prep_beats
+    pair_beats = 16 + 2 * prep_beats
     available = len(grid) - first - 1
-    pairs = available // (2 * beats_per_turn)
-    spare_pairs = available // 2 - pairs * beats_per_turn
+    pairs = available // pair_beats
+    spare_pairs = (available - pairs * pair_beats) // 2
     turns = []
     beat_index = first
     for pair in range(pairs):
         # Put spare beats before the demonstrations, keeping both players equal.
         lead = (spare_pairs * (pair + 1) // pairs) - (spare_pairs * pair // pairs)
-        for _ in range(2):
-            length = beats_per_turn + lead
+        for repeats in (2, 0):
+            length = 4 * (repeats + 1) + prep_beats + lead
             beats = grid[beat_index:beat_index + length + 1]
             beat_index += length
             turns.append(dict(
                 start=round(float(beats[0]), 5), beat=round(float(np.diff(beats).mean()), 5),
-                beats=[round(float(beat), 5) for beat in beats], demoLead=lead,
+                beats=[round(float(beat), 5) for beat in beats], demoLead=lead, demoRepeats=repeats,
             ))
     target = game / "audio" / f"bgm{number}.mp3"
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -80,7 +80,7 @@ def chart(source, number, name, nominal_period):
     print(f"{name}: {60 / period:.2f} BPM, {len(turns)} turns, "
           f"{turns[0]['start']:.2f}s–{turns[-1]['beats'][-1]:.2f}s of {duration:.2f}s")
     return dict(id=f"bgm{number}", name=name, duration=round(duration, 4),
-                bpm=round(60 / period, 1), scoreCap=16000, demoRepeats=2, prepBeats=prep_beats, sceneOffset=[0, 8, 15][number - 1], audio=f"audio/{target.name}", turns=turns)
+                bpm=round(60 / period, 1), scoreCap=16000, sharedDemo=True, prepBeats=prep_beats, sceneOffset=[0, 8, 15][number - 1], audio=f"audio/{target.name}", turns=turns)
 
 
 if __name__ == "__main__":

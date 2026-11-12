@@ -40,6 +40,7 @@ const avatar = id => '<span aria-hidden="true" class="avatar" data-avatar="' + i
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const playerName = side => currentNames[side] || 'PLAYER ' + (side + 1);
+const turnPlayer = side => (side + 1) + 'P' + (currentNames[side] ? ' ' + currentNames[side] : '');
 
 function fitDisplay() {
   document.documentElement.style.setProperty('--fit', Math.min(innerWidth / 1600, innerHeight / 900));
@@ -116,7 +117,7 @@ function render() {
     screen.innerHTML = '<section class="game"><div class="hud">' + meters +
       '</div><div class="stage course-stage" id="stage"><div class="stage-top"><strong id="scene-name"></strong><div id="phase"></div><span id="clock"></span></div>' +
       '<div class="timing-rail" id="timing-rail" aria-label="버튼 타이밍"><span class="timing-target" id="timing-target"></span><div id="timing-notes"></div></div>' +
-      '<canvas class="arena" id="arena"></canvas><div id="handoff" class="handoff" hidden></div><div id="prep-callout" class="prep-callout" hidden></div><strong id="countdown" class="countdown" aria-hidden="true" hidden></strong><div class="stage-bottom"><span id="cue"></span><strong id="judgement"></strong>' +
+      '<canvas class="arena" id="arena"></canvas><div id="phase-banner" class="phase-banner" aria-hidden="true" hidden><span id="phase-player"></span><strong id="phase-action"></strong></div><div id="prep-callout" class="prep-callout" hidden></div><strong id="countdown" class="countdown" aria-hidden="true" hidden></strong><div class="stage-bottom"><span id="cue"></span><strong id="judgement"></strong>' +
       '</div><section class="pause-overlay" id="pause-overlay" hidden aria-label="일시정지"></section></div><div class="control-deck"><div class="console" id="pads">' + pads + '</div><span id="last-input"></span></div></section>';
     arena = new Arena(get('arena'));
     const timingNotes = get('timing-notes');
@@ -496,6 +497,18 @@ function burstAtTarget(lane) {
   setTimeout(() => effect.remove(), 400);
 }
 
+function updatePhaseBanner(turn, time) {
+  const banner = get('phase-banner');
+  const firstDemo = turn?.demonstrations[0];
+  const live = turn && time >= turn.response && time < turn.response + .65;
+  const demo = firstDemo != null && time >= firstDemo && time < firstDemo + .65;
+  banner.hidden = !live && !demo;
+  if (banner.hidden) return;
+  const side = turn.player === 0 ? '1P' : '2P';
+  get('phase-player').textContent = side;
+  get('phase-action').textContent = live ? '실전' : '시범';
+}
+
 function tick() {
   if (page !== 'play') return;
   const time = playback.time;
@@ -529,14 +542,11 @@ function tick() {
     if (turn) {
       changeScene(turn.scene);
       if (index !== lastTurnIndex) {
-        const handoff = get('handoff');
-        handoff.textContent = playerName(turn.player) + ' 차례';
-        handoff.hidden = false;
         lastTurnIndex = index;
         lastCueNote = undefined;
       }
-      if (time - turn.start > .65) get('handoff').hidden = true;
-    } else get('handoff').hidden = true;
+    }
+    updatePhaseBanner(turn, time);
     if (!turn) {
       const closing = time >= round.turns.at(-1).end;
       phase(closing ? 'end' : 'wait', null, closing ? '곡 마무리' : '준비!', songs[selected].name);
@@ -553,13 +563,13 @@ function tick() {
             { duration: 170, easing: 'ease-out' });
         }
       }
-      phase(index + 'prep' + count, turn.player, playerName(turn.player) + ' · 준비 ' + count, '첫 버튼을 준비하세요');
+      phase(index + 'prep' + count, turn.player, turnPlayer(turn.player) + ' · 준비 ' + count, '첫 버튼을 준비하세요');
     } else if (time < turn.response) {
       const demo = turn.demonstrations.findLastIndex(start => start <= time);
       const label = demo < 0 ? '준비' : '시범 ' + (demo + 1) + ' / ' + turn.demonstrations.length;
-      phase(index + 'call' + demo, turn.player, playerName(turn.player) + ' · ' + label, turn.scene.cue);
+      phase(index + 'call' + demo, turn.player, turnPlayer(turn.player) + ' · ' + label, turn.scene.cue);
     } else {
-      phase(index + 'response', turn.player, playerName(turn.player) + ' · 내 차례',
+      phase(index + 'response', turn.player, turnPlayer(turn.player) + ' · 실전',
         '타이밍 바의 원에 버튼 아이콘이 겹치면 누르세요');
       const upcoming = turn.notes.find(note => !note.result);
       if ((upcoming ?? null) !== lastCueNote) {
