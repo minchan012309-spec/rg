@@ -143,3 +143,11 @@ input{width:100%;padding:10px;background:var(--ink);color:var(--paper);border:1p
 #phase{font-size:24px}
 .phase-banner{position:absolute;left:50%;top:57%;translate:-50% -50%;z-index:3;display:flex;align-items:center;gap:22px;white-space:nowrap;pointer-events:none;color:var(--accent,var(--paper));text-shadow:0 4px 24px #141022;opacity:.8}
 .phase-banner span{font-size:68px}.phase-banner strong{font-size:105px;line-height:1}
+[data-touch] .control-deck{grid-template-columns:minmax(0,910px) 1fr;gap:24px}
+[data-touch] .console{grid-template-columns:repeat(6,minmax(0,1fr));gap:7px}
+[data-touch] .pad{grid-column:span 2;min-height:58px;padding:5px;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+[data-touch] .pad:nth-child(-n+2){grid-column:span 3;min-height:63px}
+[data-touch] .console[data-mode="domes"] .pad{min-height:82px}
+[data-touch] button{touch-action:manipulation}
+[data-touch] .pad .button-icon{--diameter:29px}
+[data-touch] .pad .button-icon.big{--diameter:42px}

@@ -8,6 +8,7 @@ import { Arena } from './arena.mjs';
 import { MenuMusic } from './menu-music.mjs';
 import { physicalButtons, defaultBindings, bindingMap, readBindings, assignBinding, buttonIcon, describeCode } from './controls.mjs';
 
+const touchEdition = document.documentElement.hasAttribute('data-touch');
 const bindingStorage = 'festival-controller-bindings';
 const modeStorage = 'festival-button-mode';
 let buttonMode = localStorage.getItem(modeStorage) === 'domes' ? 'domes' : 'five';
@@ -112,8 +113,10 @@ function render() {
     const meters = [0, 1].map(side => '<div class="meter"><span>' + escape(playerName(side)) +
       '</span><strong id="score' + side + '">0</strong><progress aria-label="플레이어 ' + (side + 1) +
       ' 점수" id="bar' + side + '" max="' + round.maxScores[side] + '" value="0"></progress></div>').join('');
-    const pads = moves.map((_, lane) => '<span class="pad" id="pad' + lane +
-      '">' + buttonIcon(lane) + '<small></small></span>').join('');
+    const padTag = touchEdition ? 'button' : 'span';
+    const pads = moves.map((_, lane) => '<' + padTag + ' class="pad" id="pad' + lane +
+      '" data-pad="' + lane + '"' + (touchEdition ? ' type="button" aria-label="' + physicalButtons[lane].name + '"' : '') +
+      '>' + buttonIcon(lane) + '<small></small></' + padTag + '>').join('');
     screen.innerHTML = '<section class="game"><div class="hud">' + meters +
       '</div><div class="stage course-stage" id="stage"><div class="stage-top"><strong id="scene-name"></strong><div id="phase"></div><span id="clock"></span></div>' +
       '<div class="timing-rail" id="timing-rail" aria-label="버튼 타이밍"><span class="timing-target" id="timing-target"></span><div id="timing-notes"></div></div>' +
@@ -161,6 +164,7 @@ function render() {
   }
   guide.innerHTML = page === 'play'
     ? '버튼 아이콘이 판정 원에 겹칠 때 같은 버튼을 누르세요.'
+    : touchEdition ? '가로 화면에서 메뉴와 색 버튼을 터치하세요.'
     : '<span>플레이어 1</span><span>' + buttonIcon(0) + buttonIcon(1) + ' 이동</span><span>' +
       buttonIcon(2) + ' 선택</span><span>' + buttonIcon(3) + ' 뒤로</span><span>' + buttonIcon(4) + ' 점수판</span>';
   highlight();
@@ -219,6 +223,17 @@ function action(type, index) {
       else show('home');
       break;
   }
+}
+
+if (touchEdition) {
+  screen.addEventListener('pointerdown', event => {
+    const pad = event.target.closest('button[data-pad]');
+    if (!pad || pad.hidden || page !== 'play' || paused || event.button !== 0) return;
+    event.preventDefault();
+    const now = performance.now();
+    const eventTime = event.timeStamp >= 0 && event.timeStamp <= now ? event.timeStamp : now;
+    hitButton(visibleSide, Number(pad.dataset.pad), playback.timeAt(eventTime) - inputOffset / 1000);
+  });
 }
 
 screen.addEventListener('click', event => {
@@ -834,8 +849,8 @@ get('pause-button').onclick = () => {
 };
 get('home').onclick = () => { if (page !== 'play' && !starting) show('home'); };
 get('fullscreen').onclick = () => {
-  const transition = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
-  void transition.catch(error => audioError(error.message));
+  const transition = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
+  void transition?.catch(error => audioError(error.message));
 };
 const dialog = get('connection');
 const login = get('station-login');

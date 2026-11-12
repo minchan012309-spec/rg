@@ -44,10 +44,10 @@ export class Playback {
 
   timeAt(eventTime) {
     if (!this.source) return this.offset;
-    const stamp = this.context.getOutputTimestamp();
-    const audible = stamp.performanceTime > 0
+    const stamp = this.context.getOutputTimestamp?.();
+    const audible = stamp?.performanceTime > 0
       ? Math.min(this.context.currentTime, stamp.contextTime + (eventTime - stamp.performanceTime) / 1000)
-      : this.context.currentTime;
+      : this.context.currentTime - (this.context.outputLatency || this.context.baseLatency || 0);
     return this.offset + audible - this.startAt;
   }
 

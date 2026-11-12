@@ -41,3 +41,6 @@ audio = "\n".join(f'<script type="application/octet-stream" id="bgm{i}">' +
 html = html.replace("</body>", audio + "\n<script type=\"module\">\n" + script + "\n</script>\n</body>")
 (root / "dist").mkdir(exist_ok=True)
 (root / "dist/RhythmDuel.html").write_text(html)
+
+pad = html.replace('<html lang="ko">', '<html lang="ko" data-touch>').replace('<title>RHYTHM DUEL</title>', '<title>RHYTHM DUEL · 터치판</title>')
+(root / "dist/RhythmDuel-Pad.html").write_text(pad)
