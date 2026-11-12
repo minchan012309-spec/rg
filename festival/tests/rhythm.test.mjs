@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createRound, press, advance } from '../web/game/rhythm.mjs';
+import { createRound, press, advance, timingHint } from '../web/game/rhythm.mjs';
 import { bindingMap, defaultBindings } from '../web/game/controls.mjs';
 const keyMap = bindingMap(defaultBindings);
 
@@ -137,4 +137,13 @@ test('each minigame teaches a shared pattern before player one and skips player 
       assert.equal(one.end, two.start);
     }
   }
+});
+
+test('timing feedback distinguishes early, late, and wrong-button input', () => {
+  const round = createRound(chart);
+  assert.equal(timingHint(round, 0, 0, 2.92), '빨라요');
+  assert.equal(timingHint(round, 0, 0, 3.3), '느려요');
+  assert.equal(timingHint(round, 0, 4, 3), '다른 버튼');
+  assert.equal(timingHint(round, 0, 0, 3), '');
+  assert.equal(timingHint(round, 1, 0, 3), '');
 });

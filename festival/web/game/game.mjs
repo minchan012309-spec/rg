@@ -1,4 +1,4 @@
-import { createRound, press, advance } from './rhythm.mjs';
+import { createRound, press, advance, timingHint } from './rhythm.mjs';
 import { FestivalCloud } from '../shared/cloud.mjs';
 import { title } from './title.mjs';
 import { moves, course, approachProgress, railProgress } from './course.mjs';
@@ -81,6 +81,7 @@ function show(next, index = 0) {
 }
 
 function render() {
+  document.body.classList.toggle('playing', page === 'play');
   get('pause-button').hidden = page !== 'play';
   get('pause-button').textContent = '일시정지';
   get('settings').hidden = page === 'play';
@@ -114,14 +115,18 @@ function render() {
       '</span><strong id="score' + side + '">0</strong><progress aria-label="플레이어 ' + (side + 1) +
       ' 점수" id="bar' + side + '" max="' + round.maxScores[side] + '" value="0"></progress></div>').join('');
     const padTag = touchEdition ? 'button' : 'span';
-    const pads = moves.map((_, lane) => '<' + padTag + ' class="pad" id="pad' + lane +
-      '" data-pad="' + lane + '"' + (touchEdition ? ' type="button" aria-label="' + physicalButtons[lane].name + '"' : '') +
-      '>' + buttonIcon(lane) + '<small></small></' + padTag + '>').join('');
+    const pads = [0, 1].map(side => '<div class="player-deck" data-side="' + side +
+      '"><div class="deck-label">' + escape(turnPlayer(side)) + '<span class="last-input" id="last-input' + side +
+      '"></span></div><div class="console" id="pads' + side + '" data-side="' + side + '">' +
+      moves.map((_, lane) => '<' + padTag + ' class="pad" id="pad' + side + '-' + lane +
+        '" data-side="' + side + '" data-pad="' + lane + '"' +
+        (touchEdition ? ' type="button" aria-label="' + (side + 1) + 'P ' + physicalButtons[lane].name + '"' : '') +
+        '>' + buttonIcon(lane) + '<small></small></' + padTag + '>').join('') + '</div></div>').join('');
     screen.innerHTML = '<section class="game"><div class="hud">' + meters +
       '</div><div class="stage course-stage" id="stage"><div class="stage-top"><strong id="scene-name"></strong><div id="phase"></div><span id="clock"></span></div>' +
-      '<div class="timing-rail" id="timing-rail" aria-label="버튼 타이밍"><span class="timing-target" id="timing-target"></span><div id="timing-notes"></div></div>' +
-      '<canvas class="arena" id="arena"></canvas><div id="phase-banner" class="phase-banner" aria-hidden="true" hidden><span id="phase-player"></span><strong id="phase-action"></strong></div><div id="prep-callout" class="prep-callout" hidden></div><strong id="countdown" class="countdown" aria-hidden="true" hidden></strong><div class="stage-bottom"><span id="cue"></span><strong id="judgement"></strong>' +
-      '</div><section class="pause-overlay" id="pause-overlay" hidden aria-label="일시정지"></section></div><div class="control-deck"><div class="console" id="pads">' + pads + '</div><span id="last-input"></span></div></section>';
+      '<div class="timing-rail" id="timing-rail" aria-label="버튼 타이밍"><span class="timing-target" id="timing-target"></span><div id="timing-notes"></div><strong id="judgement"></strong></div>' +
+      '<canvas class="arena" id="arena"></canvas><div id="phase-banner" class="phase-banner" aria-hidden="true" hidden><span id="phase-player"></span><strong id="phase-action"></strong></div><div id="prep-callout" class="prep-callout" hidden></div><strong id="countdown" class="countdown" aria-hidden="true" hidden></strong><div class="stage-bottom"><span id="cue"></span>' +
+      '</div><section class="pause-overlay" id="pause-overlay" hidden aria-label="일시정지"></section></div><div class="control-deck">' + pads + '</div></section>';
     arena = new Arena(get('arena'));
     const timingNotes = get('timing-notes');
     obstacles = course(round).map(obstacle => {
@@ -232,7 +237,9 @@ if (touchEdition) {
     event.preventDefault();
     const now = performance.now();
     const eventTime = event.timeStamp >= 0 && event.timeStamp <= now ? event.timeStamp : now;
-    hitButton(visibleSide, Number(pad.dataset.pad), playback.timeAt(eventTime) - inputOffset / 1000);
+    const side = Number(pad.dataset.side);
+    if (side !== visibleSide) return;
+    hitButton(side, Number(pad.dataset.pad), playback.timeAt(eventTime) - inputOffset / 1000);
   });
 }
 
@@ -303,7 +310,8 @@ function hitButton(side, lane, time, automated = false) {
   arena.strike(side, actionLane, !!result, recentInput, lane);
   const responding = round.turns.some(turn =>
     turn.player === side && time >= turn.response && time < turn.end);
-  feedback(result || (responding ? 'MISS' : '입력'), lane);
+  const hint = timingHint(round, side, lane, time, result ? round.lastHit : null);
+  feedback(result || (responding || hint ? 'MISS' : '입력'), lane, hint);
   if (!result) return;
   if (automated) exhibition = true;
   updateScores();
@@ -404,23 +412,24 @@ function updateScores() {
   });
 }
 
-function feedback(text, lane = null) {
+function feedback(text, lane = null, hint = '') {
   const judgement = get('judgement');
-  judgement.innerHTML = lane == null ? text : buttonIcon(lane) + '<span>' + text + '</span>';
+  judgement.innerHTML = '<span class="judgement-main">' + (lane == null ? '' : buttonIcon(lane)) +
+    text + '</span>' + (hint ? '<small>' + hint + '</small>' : '');
   judgement.dataset.result = text;
   clearTimeout(judgementTimer);
-  judgementTimer = setTimeout(() => { judgement.textContent = ''; }, 480);
+  judgementTimer = setTimeout(() => { judgement.textContent = ''; }, 570);
 }
 
 function flash(side, lane, input = false, actionLane = lane) {
   if (side === visibleSide) {
-    const pad = get('pad' + lane);
+    const pad = get('pad' + side + '-' + lane);
     pad.classList.add('lit');
     clearTimeout(padTimers.get(pad));
     padTimers.set(pad, setTimeout(() => pad.classList.remove('lit'), 180));
   }
   if (!input) return;
-  const indicator = get('last-input');
+  const indicator = get('last-input' + side);
   const label = sceneProp(currentScene, actionLane)?.[2] ??
     (round.buttonMode === 'domes' ? physicalButtons[lane].name : moves[lane].name);
   indicator.innerHTML = '<span>P' + (side + 1) + '</span>' + buttonIcon(lane) + '<span>' + label + '</span>';
@@ -429,17 +438,20 @@ function flash(side, lane, input = false, actionLane = lane) {
 }
 
 function updatePads() {
-  const console = get('pads');
-  console.dataset.side = visibleSide;
-  console.dataset.mode = round.buttonMode;
-  for (let lane = 0; lane < moves.length; lane++) {
-    const pad = get('pad' + lane);
-    const prop = sceneProp(currentScene, lane);
-    const domes = round.buttonMode === 'domes';
-    pad.hidden = domes && lane > 1;
-    pad.classList.toggle('unused', !domes && !prop);
-    pad.classList.remove('lit');
-    pad.querySelector('small').textContent = domes ? physicalButtons[lane].name : prop?.[2] ?? '';
+  const domes = round.buttonMode === 'domes';
+  for (const side of [0, 1]) {
+    const console = get('pads' + side);
+    console.dataset.mode = round.buttonMode;
+    console.parentElement.classList.toggle('active', side === visibleSide);
+    for (let lane = 0; lane < moves.length; lane++) {
+      const pad = get('pad' + side + '-' + lane);
+      const prop = sceneProp(currentScene, lane);
+      pad.hidden = domes && lane > 1;
+      pad.classList.toggle('unused', !domes && !prop);
+      pad.classList.remove('lit');
+      if (touchEdition) pad.disabled = side !== visibleSide;
+      pad.querySelector('small').textContent = domes ? physicalButtons[lane].name : prop?.[2] ?? '';
+    }
   }
 }
 
@@ -519,9 +531,18 @@ function updatePhaseBanner(turn, time) {
   const demo = firstDemo != null && time >= firstDemo && time < firstDemo + .65;
   banner.hidden = !live && !demo;
   if (banner.hidden) return;
+  const phase = live ? '실전' : '시범';
   const side = turn.player === 0 ? '1P' : '2P';
+  if (banner.dataset.phase === phase && banner.dataset.side === side) return;
+  banner.dataset.phase = phase;
+  banner.dataset.side = side;
   get('phase-player').textContent = side;
-  get('phase-action').textContent = live ? '실전' : '시범';
+  get('phase-action').textContent = phase;
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    banner.animate([{ scale: '1.27', opacity: .08 }, { scale: '1', opacity: .72, offset: .4 },
+      { scale: '1', opacity: .65, offset: .75 }, { scale: '.98', opacity: .25 }],
+      { duration: 640, easing: 'ease-out' });
+  }
 }
 
 function tick() {
@@ -620,22 +641,29 @@ function revealResult(winner) {
   function count(time) {
     if (page !== 'result' || round !== match || !heading.isConnected) return;
     const elapsed = time - started;
+    const starts = [550, 2750];
+    const length = 1750;
     match.scores.forEach((score, side) => {
-      const fraction = reduced ? 1 : Math.max(0, Math.min(1, (elapsed - 350 - 140 * side) / 1740));
-      const shown = Math.round(score * (1 - Math.pow(1 - fraction, 1.65)));
-      scores[side].textContent = shown.toLocaleString();
+      const fraction = reduced ? 1 : Math.max(0, Math.min(1, (elapsed - starts[side]) / length));
+      const shown = Math.round(score * (1 - Math.pow(1 - fraction, 1.5)));
+      scores[side].textContent = !reduced && elapsed < starts[side] ? '—' : shown.toLocaleString();
       bars[side].style.width = (100 * shown / match.maxScores[side]) + '%';
     });
-    if (!reduced && elapsed >= 340 && elapsed < 2050) {
-      const beat = Math.floor((elapsed - 340) / 440);
-      if (beat !== pulse) {
-        pulse = beat;
-        sound(beat % 2 ? 2 : 0);
+    if (!reduced) {
+      const active = starts.findIndex(at => elapsed >= at && elapsed < at + length);
+      heading.textContent = active < 0 ? (elapsed < 500 ? '결과 집계 중…' : '잠시만…') :
+        playerName(active) + ' 점수 공개';
+      if (active >= 0) {
+        const beat = active * 20 + Math.floor((elapsed - starts[active]) / 350);
+        if (beat !== pulse) {
+          pulse = beat;
+          sound(beat % 2 ? 2 : 3);
+        }
       }
-    }
-    if (!reduced && elapsed < 2600) {
-      requestAnimationFrame(count);
-      return;
+      if (elapsed < 5600) {
+        requestAnimationFrame(count);
+        return;
+      }
     }
     heading.textContent = winner;
     heading.classList.add('winner-reveal');

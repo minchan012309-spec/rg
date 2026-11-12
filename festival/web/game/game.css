@@ -151,3 +151,28 @@ input{width:100%;padding:10px;background:var(--ink);color:var(--paper);border:1p
 [data-touch] button{touch-action:manipulation}
 [data-touch] .pad .button-icon{--diameter:29px}
 [data-touch] .pad .button-icon.big{--diameter:42px}
+.timing-rail #judgement{position:absolute;z-index:5;left:0;width:9.7%;top:50%;translate:0 -50%;display:grid;justify-items:center;gap:4px;font-size:22px;pointer-events:none;text-shadow:0 2px 4px #130f20}
+.judgement-main{display:flex;align-items:center;justify-content:center;gap:4px}
+.judgement-main .button-icon{--diameter:15px}.judgement-main .button-icon.big{--diameter:21px}
+.timing-rail #judgement small{color:#f9eee5;font-size:15px}
+body.playing{grid-template-rows:54px minmax(0,1fr) 38px}
+.playing .game{width:1536px;gap:8px;padding:8px 0}
+.playing .meter{padding:7px 13px;gap:4px}
+.playing .course-stage{grid-template-rows:42px 66px minmax(0,1fr) 40px}
+.playing .stage-top,.playing .stage-bottom{padding-block:4px}
+.playing .prep-callout{top:115px}
+.phase-banner{top:145px;gap:11px;opacity:.68;-webkit-text-stroke:1px #231d35}
+.phase-banner span{font-size:39px}.phase-banner strong{font-size:62px}
+.playing .control-deck,[data-touch] .playing .control-deck{grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
+.player-deck{--deck-accent:var(--lime);min-width:0;opacity:.5}
+.player-deck[data-side="1"]{--deck-accent:var(--pink)}
+.player-deck.active{opacity:1}
+.deck-label{height:23px;display:flex;align-items:center;justify-content:space-between;color:var(--deck-accent);font-size:16px}
+.last-input{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:14px}
+.last-input .button-icon{--diameter:13px}.last-input .button-icon.big{--diameter:17px}
+.playing .console .pad{min-height:35px;padding:4px}
+[data-touch] .playing .console .pad{min-height:41px}
+[data-touch] .playing .console[data-mode="domes"] .pad{grid-column:span 1;min-height:56px}
+[data-touch] .playing .console[data-mode="domes"]{grid-template-columns:repeat(2,minmax(0,1fr))}
+[data-touch] .playing .pad .button-icon{--diameter:23px}
+[data-touch] .playing .pad .button-icon.big{--diameter:32px}

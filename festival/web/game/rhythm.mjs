@@ -74,3 +74,23 @@ export function press(round, player, lane, time) {
   round.lastHit = note;
   return note.result;
 }
+
+export function timingHint(round, player, lane, time, hit = null) {
+  if (hit) return direction(time - hit.time);
+  const turn = round.turns.find(candidate =>
+    candidate.player === player && time >= candidate.response - .38 && time < candidate.end);
+  if (!turn) return '';
+  const nearby = turn.notes.filter(note => !note.result || note.result === 'MISS');
+  const nearest = nearby.reduce((best, note) =>
+    !best || Math.abs(note.time - time) < Math.abs(best.time - time) ? note : best, null);
+  if (!nearest || Math.abs(nearest.time - time) > .38) return '';
+  if (nearest.lane === lane) return direction(time - nearest.time);
+  if (Math.abs(nearest.time - time) <= .095) return '다른 버튼';
+  const matching = nearby.filter(note => note.lane === lane).reduce((best, note) =>
+    !best || Math.abs(note.time - time) < Math.abs(best.time - time) ? note : best, null);
+  return matching && Math.abs(matching.time - time) <= .38 ? direction(time - matching.time) : '';
+}
+
+function direction(delta) {
+  return delta < -.035 ? '빨라요' : delta > .035 ? '느려요' : '';
+}
